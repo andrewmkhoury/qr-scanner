@@ -184,8 +184,29 @@
             margin: 0;
         }
 
+        .demo {
+            padding: 60px 0;
+            text-align: center;
+        }
+
+        .demo-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .demo-gif {
+            max-width: 100%;
+            height: auto;
+            margin-top: 30px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
         .how-to-use {
             padding: 60px 0;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--border-color);
         }
 
         .steps {
@@ -411,6 +432,18 @@
                     <h3>Dark/Light Mode Support</h3>
                     <p>Seamlessly adapts to your system appearance</p>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="demo">
+        <div class="container">
+            <div class="section-header">
+                <h2>See It In Action</h2>
+                <p>Watch how easy it is to scan QR codes directly from your screen</p>
+            </div>
+            <div class="demo-content">
+                <img src="images/qr-scanner-demo.gif" alt="QR Screen Scanner Demo" class="demo-gif">
             </div>
         </div>
     </section>
