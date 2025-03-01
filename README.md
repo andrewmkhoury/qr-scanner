@@ -61,6 +61,14 @@ This project is licensed under the [Apache License 2.0](LICENSE) - see the LICEN
 
 Contributions are welcome! Feel free to open issues or submit pull requests.
 
+## ☕ Support
+
+If you find QR Screen Scanner helpful in your daily workflow and would like to support its development:
+
+[![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/andrewmkhoury)
+
+Your support helps maintain the app, fix bugs, and develop new features!
+
 ## 📬 Contact
 
 If you have any questions or feedback, please open an issue on GitHub. 
