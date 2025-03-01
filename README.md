@@ -4,6 +4,8 @@ A powerful, native macOS app that lets you scan QR codes directly from your scre
 
 ![QR Screen Scanner Demo](docs/images/app-demo.png)
 
+**[Visit the Website](https://andrewmkhoury.github.io/qr-scanner/) | [Download Latest Release](https://github.com/andrewmkhoury/qr-scanner/releases/latest)**
+
 ## 🚀 Features
 
 - **📱 Screen Area Selection**: Select any area of your screen containing QR codes using a simple dragging interface
