@@ -15,12 +15,14 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("QR Code Content")
                 .font(.headline)
+                .foregroundColor(Color(.labelColor))
                 .padding(.bottom, 4)
             
             Text(result)
                 .font(.system(.body, design: .monospaced))
                 .lineLimit(5)
                 .multilineTextAlignment(.leading)
+                .foregroundColor(Color(.labelColor))
                 .padding(8)
                 .background(Color(.textBackgroundColor).opacity(0.2))
                 .cornerRadius(6)
@@ -85,6 +87,7 @@ struct LinkPreview: View {
                 
                 Text(title)
                     .font(.headline)
+                    .foregroundColor(Color(.labelColor))
                     .lineLimit(1)
             }
             
