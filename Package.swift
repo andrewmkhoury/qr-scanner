@@ -31,8 +31,6 @@ let package = Package(
                 "QRScreenScanner-Info.plist",
                 "test_view",
                 "build.sh",
-                "simple_build.sh",
-                "package_dmg.sh",
                 "repackage.sh",
                 "repackage_pro.sh",
                 "update_app.sh",
@@ -41,7 +39,8 @@ let package = Package(
                 "test_app.sh",
                 "build_app.sh",
                 "create_simple_background.sh",
-                "QRScreenScanner.dmg"
+                "QRScreenScanner.dmg",
+                "BUILD.md"
             ],
             resources: [
                 .process("AppIcon.icns")
