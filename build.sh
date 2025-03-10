@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to properly build QR Screen Scanner app using Swift Package Manager
+# QR Screen Scanner Build Script
 # This script builds the app from source and packages it as a macOS app
 
 # Set variables
@@ -23,26 +23,28 @@ echo ""
 echo "Cleaning up previous temporary files..."
 rm -rf "${TEMP_APP}" "${TEMP_DIR}" "${DMG_NAME}.dmg"
 
-# Make sure dmg_contents doesn't have any symlinks to system folders
+# Check for and remove problematic symlinks
 echo "Checking for problematic symlinks..."
 if [ -d "dmg_contents" ]; then
     echo "Removing dmg_contents directory to prevent build issues..."
     rm -rf "dmg_contents"
 fi
 
-# Build the project using Swift Package Manager with a timeout
+# Clean build directory
+echo "Cleaning build directory..."
+rm -rf .build
+
+# Build the project using Swift Package Manager
 echo "Building project using Swift Package Manager..."
-# Use timeout command to prevent hanging
-timeout 300 swift build -c release || {
-    echo "Build timed out or failed. Trying again with verbose output..."
-    timeout 300 swift build -c release -v
-}
+swift build -c release
 
 # Check if build was successful
 if [ ! -f "${BUILD_DIR}/QRScreenScanner" ]; then
     echo "Error: Build failed! Executable not found at ${BUILD_DIR}/QRScreenScanner"
     exit 1
 fi
+
+echo "Build successful! Creating app bundle..."
 
 # Create app bundle structure
 echo "Creating app bundle structure..."
@@ -133,7 +135,7 @@ echo "Cleaning up temporary files..."
 rm -rf "${TEMP_DIR}"
 
 echo ""
-echo "=== Packaging Complete ==="
+echo "=== Build Complete ==="
 echo "DMG file created: ${DMG_NAME}.dmg"
 echo ""
 echo "To test the app:"
