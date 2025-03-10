@@ -15,21 +15,15 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("QR Code Content")
                 .font(.headline)
-                .foregroundColor(.primary)
                 .padding(.bottom, 4)
             
             Text(result)
                 .font(.system(.body, design: .monospaced))
                 .lineLimit(5)
                 .multilineTextAlignment(.leading)
-                .foregroundColor(.primary)
                 .padding(8)
-                .background(Color.gray.opacity(0.2))
+                .background(Color(.textBackgroundColor).opacity(0.2))
                 .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.gray, lineWidth: 1)
-                )
             
             HStack {
                 Button(action: {
@@ -43,7 +37,6 @@ struct ResultView: View {
                     }
                 }) {
                     Label(isCopied ? "Copied!" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
-                        .foregroundColor(.primary)
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 
@@ -56,7 +49,6 @@ struct ResultView: View {
                         }
                     }) {
                         Label("Open URL", systemImage: "safari")
-                            .foregroundColor(.primary)
                     }
                     .buttonStyle(BorderlessButtonStyle())
                 }
@@ -70,7 +62,6 @@ struct ResultView: View {
         }
         .padding()
         .frame(width: 320)
-        .preferredColorScheme(.light)
     }
 }
 
@@ -94,21 +85,16 @@ struct LinkPreview: View {
                 
                 Text(title)
                     .font(.headline)
-                    .foregroundColor(.primary)
                     .lineLimit(1)
             }
             
             Text(urlString)
                 .font(.caption)
-                .foregroundColor(.primary)
+                .foregroundColor(.secondary)
                 .lineLimit(1)
         }
         .padding(12)
-        .background(Color.gray.opacity(0.2))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray, lineWidth: 1)
-        )
+        .background(Color(.windowBackgroundColor).opacity(0.8))
         .onAppear {
             loadWebsiteInfo()
         }

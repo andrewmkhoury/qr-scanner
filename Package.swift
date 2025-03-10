@@ -17,7 +17,32 @@ let package = Package(
             name: "QRScreenScanner",
             dependencies: [],
             path: ".",
-            exclude: ["README.md", "Info.plist", "create_icns.sh", "AppIcon.iconset", "appicon.png"],
+            exclude: [
+                "README.md", 
+                "Info.plist", 
+                "create_icns.sh", 
+                "AppIcon.iconset", 
+                "appicon.png",
+                "docs",
+                "QRScreenScanner.xcodeproj",
+                "PACKAGING.md",
+                "LICENSE",
+                "QRScanner-screenshot.png",
+                "QRScreenScanner-Info.plist",
+                "test_view",
+                "build.sh",
+                "simple_build.sh",
+                "package_dmg.sh",
+                "repackage.sh",
+                "repackage_pro.sh",
+                "update_app.sh",
+                "rebuild_test.sh",
+                "rebuild_with_fix.sh",
+                "test_app.sh",
+                "build_app.sh",
+                "create_simple_background.sh",
+                "QRScreenScanner.dmg"
+            ],
             resources: [
                 .process("AppIcon.icns")
             ]
