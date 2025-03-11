@@ -1,18 +1,17 @@
 #!/bin/bash
 
-# QR Screen Scanner Build Script
-# This script builds the app from source and packages it as a macOS app
+# Script to build QR Screen Scanner app with the updated ResultView.swift
+# This is a simplified version that doesn't rely on swift build
 
 # Set variables
 APP_NAME="QR Scanner"
-APP_VERSION="1.0.2"
+APP_VERSION="1.0.0"
 APP_BUILD="1"
 APP_BUNDLE_ID="com.andrewmkhoury.qrscreenscanner"
 APP_COPYRIGHT="Copyright © 2023 Andrew Khoury. All rights reserved."
 DMG_NAME="QRScreenScanner_v${APP_VERSION}"
 TEMP_APP="${APP_NAME}.app"
 TEMP_DIR="temp_dmg"
-BUILD_DIR=".build/release"
 
 # Print status message
 echo "=== QR Screen Scanner Build Tool ==="
@@ -23,53 +22,25 @@ echo ""
 echo "Cleaning up previous temporary files..."
 rm -rf "${TEMP_APP}" "${TEMP_DIR}" "${DMG_NAME}.dmg"
 
-# Check for and remove problematic symlinks
-echo "Checking for problematic symlinks..."
-if [ -d "dmg_contents" ]; then
-    echo "Removing dmg_contents directory to prevent build issues..."
-    rm -rf "dmg_contents"
-fi
-
-# Clean build directory
-echo "Cleaning build directory..."
-rm -rf .build
-
-# Build the project using Swift Package Manager
-echo "Building project using Swift Package Manager..."
-swift build -c release
-
-# Check if build was successful
-if [ ! -f "${BUILD_DIR}/QRScreenScanner" ]; then
-    echo "Error: Build failed! Executable not found at ${BUILD_DIR}/QRScreenScanner"
-    exit 1
-fi
-
-echo "Build successful! Creating app bundle..."
-
 # Create app bundle structure
 echo "Creating app bundle structure..."
 mkdir -p "${TEMP_APP}/Contents/"{MacOS,Resources}
 
-# Copy executable
-echo "Copying executable..."
-cp "${BUILD_DIR}/QRScreenScanner" "${TEMP_APP}/Contents/MacOS/"
-chmod +x "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
+# Copy executable from existing app
+echo "Copying executable from existing app..."
+if [ -d "QR Scanner.app" ]; then
+    cp "QR Scanner.app/Contents/MacOS/QR Scanner" "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
+    chmod +x "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
+else
+    echo "Error: Existing app not found!"
+    exit 1
+fi
 
 # Copy resources
 echo "Copying resources..."
 cp "AppIcon.icns" "${TEMP_APP}/Contents/Resources/"
 cp "images/app-icon.png" "${TEMP_APP}/Contents/Resources/"
-
-# Copy Swift source files for reference
-echo "Copying Swift source files..."
-mkdir -p "${TEMP_APP}/Contents/Resources/Sources"
-cp "ResultView.swift" "${TEMP_APP}/Contents/Resources/Sources/"
-cp "QRScreenScanner.swift" "${TEMP_APP}/Contents/Resources/Sources/"
-cp "QRHighlightView.swift" "${TEMP_APP}/Contents/Resources/Sources/"
-cp "CaptureWindowController.swift" "${TEMP_APP}/Contents/Resources/Sources/"
-cp "SmartModeController.swift" "${TEMP_APP}/Contents/Resources/Sources/"
-cp "QRCodeGeneratorView.swift" "${TEMP_APP}/Contents/Resources/Sources/"
-cp "main.swift" "${TEMP_APP}/Contents/Resources/Sources/"
+cp "ResultView.swift" "${TEMP_APP}/Contents/Resources/"
 
 # Create Info.plist
 echo "Creating Info.plist..."
@@ -136,7 +107,7 @@ echo "Cleaning up temporary files..."
 rm -rf "${TEMP_DIR}"
 
 echo ""
-echo "=== Build Complete ==="
+echo "=== Packaging Complete ==="
 echo "DMG file created: ${DMG_NAME}.dmg"
 echo ""
 echo "To test the app:"

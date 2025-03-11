@@ -45,7 +45,7 @@ let package = Package(
             ],
             resources: [
                 .process("AppIcon.icns"),
-                .process("appicon.png")
+                .process("images/app-icon.png")
             ]
         ),
     ]
