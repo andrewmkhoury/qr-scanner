@@ -423,10 +423,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Check if a window already exists and just bring it forward
         if let existingWindow = qrCodeWindow, existingWindow.isVisible {
+            print("Using existing QR Code window")
             existingWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
+        
+        print("Creating new QR Code window")
         
         // Create and configure the QR code creation window
         let window = NSWindow(
@@ -453,23 +456,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Respect system appearance setting
         window.appearance = NSAppearance.current
         
+        print("Creating QRCodeGeneratorView")
+        
         // Create SwiftUI QRCodeGenerator view and host it in the window
         let qrCodeGeneratorView = QRCodeGeneratorView()
+        print("QRCodeGeneratorView created successfully")
+        
         let hostingView = NSHostingView(rootView: qrCodeGeneratorView)
+        print("NSHostingView created successfully")
+        
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 450)
         hostingView.autoresizingMask = [.width, .height]
         
         window.contentView = hostingView
+        print("ContentView set successfully")
+        
         window.makeKeyAndOrderFront(nil)
+        print("Window ordered front")
+        
         NSApp.activate(ignoringOtherApps: true)
+        print("App activated")
         
         // Store the window reference
         self.qrCodeWindow = window
+        print("Window reference stored")
         
         // After a brief delay, bring the window to front and activate input
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            print("Executing delayed window activation")
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            print("Delayed activation complete")
         }
     }
 }

@@ -90,6 +90,9 @@ struct MacOSTextField: NSViewRepresentable {
         func textDidBeginEditing(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             
+            // Ensure keyboard focus
+            NSApp.activate(ignoringOtherApps: true)
+            
             // Clear placeholder when editing begins
             if isShowingPlaceholder {
                 textView.string = ""
@@ -119,7 +122,7 @@ struct QRCodeGeneratorView: View {
     var body: some View {
         VStack(spacing: 20) {
             // App icon and title at the top
-            Image("images/app-icon")
+            Image(systemName: "qrcode")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 60, height: 60)

@@ -47,10 +47,12 @@ let package = Package(
                 "QRScreenScanner_v1.0.2.dmg",
                 "create_icns.sh",
                 "QRScreenScanner.dmg",
-                "update_app.sh"
+                "update_app.sh",
+                "Resources.bundle",
+                "images"
             ],
             resources: [
-                .process("images"),
+                .process("Resources"),
                 .process("AppIcon.icns")
             ]
         ),
