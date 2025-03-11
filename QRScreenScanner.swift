@@ -425,11 +425,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let existingWindow = qrCodeWindow, existingWindow.isVisible {
             print("Using existing QR Code window")
             existingWindow.makeKeyAndOrderFront(nil)
+            
+            // Try to make text field first responder
+            if let scrollView = existingWindow.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
+               let textView = scrollView.documentView as? NSTextView {
+                existingWindow.makeFirstResponder(textView)
+                print("Set existing textView as first responder")
+            }
+            
             NSApp.activate(ignoringOtherApps: true)
             return
         } else if let existingWindow = qrCodeWindow {
             print("Existing window found but not visible - making visible")
             existingWindow.makeKeyAndOrderFront(nil)
+            
+            // Try to make text field first responder
+            if let scrollView = existingWindow.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
+               let textView = scrollView.documentView as? NSTextView {
+                existingWindow.makeFirstResponder(textView)
+                print("Set existing textView as first responder")
+            }
+            
             NSApp.activate(ignoringOtherApps: true)
             return
         }
@@ -452,11 +468,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("Setting isReleasedWhenClosed to false")
         
         // Configure window for proper keyboard input handling
-        window.level = NSWindow.Level.floating  // Use floating level to keep it above other windows
-        print("Setting window level to floating")
+        // Use normal window level for better keyboard handling
+        window.level = .normal
+        print("Setting window level to normal")
         
-        // Configure window behavior to remain visible across spaces
-        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        // Configure window behavior to work well with keyboard focus
+        window.collectionBehavior = [.moveToActiveSpace]
         print("Setting window collection behavior")
         
         // Make window delegate self to handle window closing
@@ -488,27 +505,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.qrCodeWindow = window
         print("Window reference stored")
         
+        // Make key window before showing it
+        window.makeKey()
+        print("Window made key")
+        
+        // Make window visible
         window.makeKeyAndOrderFront(nil)
         print("Window ordered front")
         
+        // Explicitly activate app to ensure it has focus
         NSApp.activate(ignoringOtherApps: true)
         print("App activated")
         
-        // After a brief delay, bring the window to front and activate input again
-        // This helps ensure the window remains visible
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            print("Executing delayed window activation")
+        // After a brief delay, look for text view and make it first responder
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Find the NSScrollView containing the text view
+            if let scrollView = window.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
+               let textView = scrollView.documentView as? NSTextView {
+                window.makeFirstResponder(textView)
+                print("Made text view first responder after delay")
+            } else {
+                print("Could not find text view to make first responder")
+            }
+            
+            // Make sure window is key and front
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
-            print("Delayed activation complete")
-            
-            // Additional activation to ensure window stays in front
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                window.makeKeyAndOrderFront(nil)
-                window.orderFrontRegardless()  // More forceful ordering to front
-                NSApp.activate(ignoringOtherApps: true)
-                print("Extra activation complete - window should be visible now")
-            }
         }
     }
 }

@@ -35,6 +35,24 @@ struct MacOSTextField: NSViewRepresentable {
         scrollView.hasVerticalScroller = isMultiline
         scrollView.hasHorizontalScroller = false
         
+        // Ensure the text view becomes first responder when its window appears
+        DispatchQueue.main.async {
+            if let window = textView.window {
+                window.makeFirstResponder(textView)
+                print("Set textView as first responder")
+            } else {
+                print("No window available for first responder")
+            }
+        }
+        
+        // Add notification observer for when the window becomes key
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+        
         return scrollView
     }
     
@@ -46,6 +64,16 @@ struct MacOSTextField: NSViewRepresentable {
         if textView.string != text && !context.coordinator.isShowingPlaceholder {
             textView.string = text
         }
+        
+        // Try to make the text view first responder
+        if let window = scrollView.window, window.isKeyWindow {
+            window.makeFirstResponder(textView)
+        }
+    }
+    
+    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
+        // Remove notification observer
+        NotificationCenter.default.removeObserver(coordinator)
     }
     
     func makeCoordinator() -> Coordinator {
@@ -56,15 +84,33 @@ struct MacOSTextField: NSViewRepresentable {
         var text: Binding<String>
         var placeholder: String
         var isShowingPlaceholder = false
+        weak var textView: NSTextView?
         
         init(text: Binding<String>, placeholder: String) {
             self.text = text
             self.placeholder = placeholder
+            super.init()
+        }
+        
+        // Handle window becoming key
+        @objc func windowDidBecomeKey(_ notification: Notification) {
+            guard let window = notification.object as? NSWindow,
+                  let scrollView = window.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
+                  let textView = scrollView.documentView as? NSTextView else {
+                return
+            }
+            
+            // When our window becomes key, make the text view first responder
+            DispatchQueue.main.async {
+                window.makeFirstResponder(textView)
+                print("Window became key, setting textView as first responder")
+            }
         }
         
         // Handle click or tab into the text field
         func textDidBeginEditing(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            self.textView = textView
             
             // Clear placeholder when editing begins
             if isShowingPlaceholder {
@@ -75,7 +121,11 @@ struct MacOSTextField: NSViewRepresentable {
             
             // Ensure keyboard focus
             DispatchQueue.main.async {
+                if let window = textView.window {
+                    window.makeFirstResponder(textView)
+                }
                 NSApp.activate(ignoringOtherApps: true)
+                print("Text editing began, ensured text view is first responder")
             }
         }
         
