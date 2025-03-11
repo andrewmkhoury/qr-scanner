@@ -1,4 +1,6 @@
 // swift-tools-version:5.3
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
 import PackageDescription
 
 let package = Package(
@@ -7,10 +9,12 @@ let package = Package(
         .macOS(.v11)
     ],
     products: [
-        .executable(name: "QRScreenScanner", targets: ["QRScreenScanner"]),
+        .executable(
+            name: "QRScreenScanner",
+            targets: ["QRScreenScanner"]),
     ],
     dependencies: [
-        // No external dependencies as we're using Apple's built-in frameworks
+        // No dependencies
     ],
     targets: [
         .target(
@@ -18,34 +22,36 @@ let package = Package(
             dependencies: [],
             path: ".",
             exclude: [
-                "README.md", 
-                "Info.plist", 
-                "create_icns.sh", 
-                "AppIcon.iconset", 
-                "docs",
-                "QRScreenScanner.xcodeproj",
-                "PACKAGING.md",
-                "LICENSE",
-                "QRScanner-screenshot.png",
-                "QRScreenScanner-Info.plist",
-                "test_view",
+                "README.md",
                 "build.sh",
                 "repackage.sh",
                 "repackage_pro.sh",
-                "update_app.sh",
-                "rebuild_test.sh",
-                "rebuild_with_fix.sh",
-                "test_app.sh",
-                "build_app.sh",
                 "create_simple_background.sh",
-                "QRScreenScanner.dmg",
+                "PACKAGING.md",
+                "build_app.sh",
+                "release_notes.md",
+                "QR Scanner.app",
+                "docs",
+                ".build",
+                "LICENSE",
+                "rebuild_test.sh",
+                "test_app.sh",
+                "test_view",
                 "BUILD.md",
+                "AppIcon.iconset",
+                "rebuild_with_fix.sh",
+                "Info.plist",
+                "QRScreenScanner-Info.plist",
                 "QRScreenScanner_v1.0.0.dmg",
                 "QRScreenScanner_v1.0.1.dmg",
+                "QRScreenScanner_v1.0.2.dmg",
+                "create_icns.sh",
+                "QRScreenScanner.dmg",
+                "update_app.sh"
             ],
             resources: [
-                .process("AppIcon.icns"),
-                .process("images/app-icon.png")
+                .process("images"),
+                .process("AppIcon.icns")
             ]
         ),
     ]

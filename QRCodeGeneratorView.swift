@@ -35,9 +35,19 @@ struct MacOSTextField: NSViewRepresentable {
         scrollView.hasVerticalScroller = isMultiline
         scrollView.hasHorizontalScroller = false
         
-        // Set placeholder if empty
+        // Set placeholder using attributed string instead of placeholderString
         if text.isEmpty {
-            textView.placeholderString = placeholder
+            let placeholderAttrString = NSAttributedString(
+                string: placeholder,
+                attributes: [
+                    .foregroundColor: NSColor.placeholderTextColor,
+                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize)
+                ]
+            )
+            textView.textStorage?.setAttributedString(placeholderAttrString)
+            
+            // Add a special flag to our coordinator to indicate this is a placeholder
+            context.coordinator.isShowingPlaceholder = true
         }
         
         return scrollView
@@ -47,8 +57,21 @@ struct MacOSTextField: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         
         // Only update if the text has changed from an external source
-        if textView.string != text {
+        if textView.string != text && !context.coordinator.isShowingPlaceholder {
             textView.string = text
+        }
+        
+        // Handle placeholder visibility
+        if text.isEmpty && !context.coordinator.isShowingPlaceholder {
+            let placeholderAttrString = NSAttributedString(
+                string: placeholder,
+                attributes: [
+                    .foregroundColor: NSColor.placeholderTextColor,
+                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize)
+                ]
+            )
+            textView.textStorage?.setAttributedString(placeholderAttrString)
+            context.coordinator.isShowingPlaceholder = true
         }
     }
     
@@ -58,13 +81,25 @@ struct MacOSTextField: NSViewRepresentable {
     
     class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
+        var isShowingPlaceholder = false
         
         init(text: Binding<String>) {
             self.text = text
         }
         
+        func textDidBeginEditing(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            
+            // Clear placeholder when editing begins
+            if isShowingPlaceholder {
+                textView.string = ""
+                isShowingPlaceholder = false
+            }
+        }
+        
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            isShowingPlaceholder = false
             self.text.wrappedValue = textView.string
         }
     }
@@ -76,7 +111,6 @@ struct QRCodeGeneratorView: View {
     @State private var isImageGenerated = false
     @State private var errorMessage: String? = nil
     @State private var showCopyFeedback: Bool = false
-    @FocusState private var isInputFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
     
     private let context = CIContext()
@@ -109,6 +143,12 @@ struct QRCodeGeneratorView: View {
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                     )
+                    .onAppear {
+                        // Set focus after a delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            NSApp.activate(ignoringOtherApps: true)
+                        }
+                    }
             }
             .padding(.horizontal)
             
