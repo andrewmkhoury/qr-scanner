@@ -22,7 +22,6 @@ let package = Package(
                 "Info.plist", 
                 "create_icns.sh", 
                 "AppIcon.iconset", 
-                "appicon.png",
                 "docs",
                 "QRScreenScanner.xcodeproj",
                 "PACKAGING.md",
@@ -43,7 +42,8 @@ let package = Package(
                 "BUILD.md"
             ],
             resources: [
-                .process("AppIcon.icns")
+                .process("AppIcon.icns"),
+                .process("appicon.png")
             ]
         ),
     ]

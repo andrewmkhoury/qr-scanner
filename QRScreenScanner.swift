@@ -216,8 +216,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create a window with more modern dimensions
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        let windowWidth: CGFloat = 500
-        let windowHeight: CGFloat = 400  // Increased height for ResultView
+        let windowWidth: CGFloat = 400  // Adjusted width for the updated ResultView
+        let windowHeight: CGFloat = 450  // Adjusted height for the updated ResultView with character
         
         let windowRect = NSRect(
             x: (screenRect.width - windowWidth) / 2,
