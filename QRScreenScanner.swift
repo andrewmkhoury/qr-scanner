@@ -8,6 +8,9 @@ import AVFoundation
 struct QRScreenScanner: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    // Add a property to store the QR code window reference
+    @State private var qrCodeWindow: NSWindow?
+    
     var body: some Scene {
         Settings {
             EmptyView()
@@ -19,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var smartModeController: SmartModeController?
     private let debugMode = true // Enable debug mode for additional logging
+    
+    // Add a property to store the QR code window reference
+    var qrCodeWindow: NSWindow?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         if debugMode {
@@ -211,7 +217,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create a window with more modern dimensions
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
         let windowWidth: CGFloat = 500
-        let windowHeight: CGFloat = 340  // Slightly reduced height
+        let windowHeight: CGFloat = 400  // Increased height for ResultView
         
         let windowRect = NSRect(
             x: (screenRect.width - windowWidth) / 2,
@@ -232,221 +238,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         window.title = "QR Code Detected"
         window.isReleasedWhenClosed = true
-        window.backgroundColor = NSColor(calibratedWhite: 0.98, alpha: 1.0) // Light gray background
         
-        // Create the main content view
-        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight))
+        // Use system background color for proper dark mode support
+        window.backgroundColor = NSColor.windowBackgroundColor
         
-        // Add app icon at the top with reduced space above
-        let iconSize: CGFloat = 85  // Keep the same size
-        let iconView = NSImageView(frame: NSRect(
-            x: (windowWidth - iconSize) / 2,
-            y: windowHeight - iconSize - 20,  // Reduced space above the icon (was 40)
-            width: iconSize,
-            height: iconSize
-        ))
+        // Respect system appearance setting
+        window.appearance = NSAppearance.current
         
-        // Try to load the app icon
+        // Create SwiftUI ResultView and host it in the window
+        let resultView = ResultView(result: payload)
+        let hostingView = NSHostingView(rootView: resultView)
+        hostingView.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
+        hostingView.autoresizingMask = [.width, .height]
         
-        // Try direct absolute path first (for development)
-        let workspacePath = "/Users/akhoury/Source/qr-code-scanner"
-        if FileManager.default.fileExists(atPath: workspacePath + "/appicon.png"),
-           let loadedImage = NSImage(contentsOfFile: workspacePath + "/appicon.png") {
-            iconView.image = loadedImage
-            print("Loaded app icon from absolute workspace path")
-        }
-        // Then try current directory
-        else if let projectPath = FileManager.default.currentDirectoryPath as String?,
-           let loadedImage = NSImage(contentsOfFile: projectPath + "/appicon.png") {
-            iconView.image = loadedImage
-            print("Loaded app icon from project directory")
-        }
-        // Then try bundle resources
-        else if let iconPath = Bundle.main.path(forResource: "appicon", ofType: "png"),
-           let loadedImage = NSImage(contentsOfFile: iconPath) {
-            iconView.image = loadedImage
-            print("Loaded app icon from bundle resources")
-        }
-        // Then try bundle path
-        else if let loadedImage = NSImage(contentsOfFile: Bundle.main.bundlePath + "/Contents/Resources/appicon.png") {
-            iconView.image = loadedImage
-            print("Loaded app icon from bundle path")
-        }
-        // Fallback to system icon
-        else if let loadedImage = NSImage(named: "qrcode") {
-            iconView.image = loadedImage
-            print("Using system QR code icon as fallback")
-        }
-        // Final fallback
-        else {
-            iconView.image = NSImage(named: NSImage.infoName)
-            print("Using info icon as final fallback")
-        }
-        
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        contentView.addSubview(iconView)
-        
-        // Add a title label
-        let titleLabel = NSTextField(frame: NSRect(
-            x: 20,
-            y: windowHeight - iconSize - 40,  // Adjusted position (was 60)
-            width: windowWidth - 40,
-            height: 24
-        ))
-        titleLabel.stringValue = "QR Code Content"
-        titleLabel.isEditable = false
-        titleLabel.isBordered = false
-        titleLabel.isSelectable = false
-        titleLabel.alignment = .center
-        titleLabel.font = NSFont.boldSystemFont(ofSize: 16)
-        titleLabel.textColor = .labelColor
-        titleLabel.backgroundColor = .clear
-        contentView.addSubview(titleLabel)
-        
-        // Create a scrollable text view for the QR code content
-        let scrollView = NSScrollView(frame: NSRect(
-            x: 30,
-            y: 100,
-            width: windowWidth - 60,
-            height: windowHeight - iconSize - 90  // Adjusted height (was 110)
-        ))
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .bezelBorder
-        
-        let textView = NSTextView(frame: NSRect(
-            x: 0,
-            y: 0,
-            width: scrollView.contentSize.width,
-            height: scrollView.contentSize.height
-        ))
-        textView.string = payload
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.font = NSFont.systemFont(ofSize: 14)
-        textView.textColor = .labelColor
-        textView.backgroundColor = NSColor.white
-        textView.textContainer?.lineFragmentPadding = 10
-        textView.textContainerInset = NSSize(width: 10, height: 10)
-        
-        scrollView.documentView = textView
-        contentView.addSubview(scrollView)
-        
-        // Add buttons with fixed width to ensure they appear properly
-        let buttonHeight: CGFloat = 32
-        let buttonSpacing: CGFloat = 20
-        let buttonY: CGFloat = 40
-        
-        // Add a hidden text field to store the payload
-        let payloadField = NSTextField(frame: NSRect.zero)
-        payloadField.isHidden = true
-        payloadField.stringValue = payload
-        payloadField.identifier = NSUserInterfaceItemIdentifier("payload")
-        payloadField.tag = 100 // Set tag for easier retrieval
-        contentView.addSubview(payloadField)
-        
-        let isURL = payload.hasPrefix("http://") || payload.hasPrefix("https://")
-        
-        if isURL, let _ = URL(string: payload) {
-            // Create buttons for URL with fixed widths
-            let openURLButton = NSButton(frame: NSRect(x: 0, y: 0, width: 120, height: buttonHeight))
-            openURLButton.title = "Open URL"
-            openURLButton.bezelStyle = .rounded
-            openURLButton.target = self
-            openURLButton.action = #selector(openURL(_:))
-            openURLButton.identifier = NSUserInterfaceItemIdentifier("openURL")
-            
-            let copyButton = NSButton(frame: NSRect(x: 0, y: 0, width: 150, height: buttonHeight))
-            copyButton.title = "Copy to Clipboard"
-            copyButton.bezelStyle = .rounded
-            copyButton.target = self
-            copyButton.action = #selector(copyToClipboard(_:))
-            copyButton.identifier = NSUserInterfaceItemIdentifier("copy")
-            
-            let closeButton = NSButton(frame: NSRect(x: 0, y: 0, width: 120, height: buttonHeight))
-            closeButton.title = "Close"
-            closeButton.bezelStyle = .rounded
-            closeButton.target = self
-            closeButton.action = #selector(closeQRCodeWindow(_:))
-            
-            // Calculate total width of all buttons
-            let totalButtonWidth = openURLButton.frame.width + copyButton.frame.width + closeButton.frame.width + (buttonSpacing * 2)
-            let startX = (windowWidth - totalButtonWidth) / 2
-            
-            // Position buttons
-            openURLButton.frame = NSRect(
-                x: startX,
-                y: buttonY,
-                width: openURLButton.frame.width,
-                height: buttonHeight
-            )
-            
-            copyButton.frame = NSRect(
-                x: startX + openURLButton.frame.width + buttonSpacing,
-                y: buttonY,
-                width: copyButton.frame.width,
-                height: buttonHeight
-            )
-            
-            closeButton.frame = NSRect(
-                x: startX + openURLButton.frame.width + copyButton.frame.width + (buttonSpacing * 2),
-                y: buttonY,
-                width: closeButton.frame.width,
-                height: buttonHeight
-            )
-            
-            contentView.addSubview(openURLButton)
-            contentView.addSubview(copyButton)
-            contentView.addSubview(closeButton)
-        } else {
-            // Create buttons for non-URL with fixed widths
-            let copyButton = NSButton(frame: NSRect(x: 0, y: 0, width: 150, height: buttonHeight))
-            copyButton.title = "Copy to Clipboard"
-            copyButton.bezelStyle = .rounded
-            copyButton.target = self
-            copyButton.action = #selector(copyToClipboard(_:))
-            copyButton.identifier = NSUserInterfaceItemIdentifier("copy")
-            
-            let closeButton = NSButton(frame: NSRect(x: 0, y: 0, width: 120, height: buttonHeight))
-            closeButton.title = "Close"
-            closeButton.bezelStyle = .rounded
-            closeButton.target = self
-            closeButton.action = #selector(closeQRCodeWindow(_:))
-            
-            // Calculate total width of all buttons
-            let totalButtonWidth = copyButton.frame.width + closeButton.frame.width + buttonSpacing
-            let startX = (windowWidth - totalButtonWidth) / 2
-            
-            // Position buttons
-            copyButton.frame = NSRect(
-                x: startX,
-                y: buttonY,
-                width: copyButton.frame.width,
-                height: buttonHeight
-            )
-            
-            closeButton.frame = NSRect(
-                x: startX + copyButton.frame.width + buttonSpacing,
-                y: buttonY,
-                width: closeButton.frame.width,
-                height: buttonHeight
-            )
-            
-            contentView.addSubview(copyButton)
-            contentView.addSubview(closeButton)
-        }
-        
-        // Add a separator line above the buttons
-        let separator = NSBox(frame: NSRect(
-            x: 20,
-            y: buttonY + buttonHeight + 15,
-            width: windowWidth - 40,
-            height: 1
-        ))
-        separator.boxType = .separator
-        contentView.addSubview(separator)
-        
-        window.contentView = contentView
+        window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
         window.level = .floating
         
@@ -457,10 +262,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.animator().alphaValue = 1.0
         })
         
-        // Activate the application to bring it to the foreground
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        
-        print("QR code window created and displayed")
+        // Store the window reference
+        self.qrCodeWindow = window
     }
     
     @objc func closeQRCodeWindow(_ sender: NSButton) {

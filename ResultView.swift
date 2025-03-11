@@ -3,6 +3,7 @@ import SwiftUI
 struct ResultView: View {
     let result: String
     @State private var isCopied = false
+    @Environment(\.colorScheme) private var colorScheme
     
     private var isURL: Bool {
         if let url = URL(string: result), url.scheme != nil {
@@ -15,14 +16,16 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("QR Code Content")
                 .font(.headline)
+                .foregroundColor(.primary)
                 .padding(.bottom, 4)
             
             Text(result)
                 .font(.system(.body, design: .monospaced))
                 .lineLimit(5)
                 .multilineTextAlignment(.leading)
+                .foregroundColor(.primary)
                 .padding(8)
-                .background(Color(.textBackgroundColor).opacity(0.2))
+                .background(Color.secondary.opacity(0.1))
                 .cornerRadius(6)
             
             HStack {
@@ -37,6 +40,7 @@ struct ResultView: View {
                     }
                 }) {
                     Label(isCopied ? "Copied!" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
+                        .foregroundColor(.primary)
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 
@@ -49,6 +53,7 @@ struct ResultView: View {
                         }
                     }) {
                         Label("Open URL", systemImage: "safari")
+                            .foregroundColor(.primary)
                     }
                     .buttonStyle(BorderlessButtonStyle())
                 }
@@ -62,6 +67,7 @@ struct ResultView: View {
         }
         .padding()
         .frame(width: 320)
+        .background(colorScheme == .dark ? Color(white: 0.2) : Color(white: 0.95))
     }
 }
 
@@ -69,6 +75,7 @@ struct LinkPreview: View {
     let urlString: String
     @State private var title: String = "Loading preview..."
     @State private var faviconImage: NSImage?
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -80,11 +87,13 @@ struct LinkPreview: View {
                         .frame(width: 16, height: 16)
                 } else {
                     Image(systemName: "globe")
+                        .foregroundColor(.primary)
                         .frame(width: 16, height: 16)
                 }
                 
                 Text(title)
                     .font(.headline)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
             }
             
@@ -94,7 +103,7 @@ struct LinkPreview: View {
                 .lineLimit(1)
         }
         .padding(12)
-        .background(Color(.windowBackgroundColor).opacity(0.8))
+        .background(colorScheme == .dark ? Color(white: 0.15) : Color.secondary.opacity(0.1))
         .onAppear {
             loadWebsiteInfo()
         }
@@ -117,10 +126,22 @@ struct ResultView_Previews: PreviewProvider {
             ResultView(result: "https://www.apple.com")
                 .frame(width: 320, height: 240)
                 .previewDisplayName("URL Result")
+                .environment(\.colorScheme, .light)
+            
+            ResultView(result: "https://www.apple.com")
+                .frame(width: 320, height: 240)
+                .previewDisplayName("URL Result (Dark)")
+                .environment(\.colorScheme, .dark)
             
             ResultView(result: "Just some plain text from a QR code")
                 .frame(width: 320, height: 240)
                 .previewDisplayName("Text Result")
+                .environment(\.colorScheme, .light)
+            
+            ResultView(result: "Just some plain text from a QR code")
+                .frame(width: 320, height: 240)
+                .previewDisplayName("Text Result (Dark)")
+                .environment(\.colorScheme, .dark)
         }
     }
 } 
