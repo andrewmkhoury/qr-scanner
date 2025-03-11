@@ -118,10 +118,8 @@ struct ResultView: View {
             return
         }
         
-        // Try direct absolute path (for development)
-        let workspacePath = "/Users/akhoury/Source/qr-code-scanner"
-        if FileManager.default.fileExists(atPath: workspacePath + "/appicon.png"),
-           let loadedImage = NSImage(contentsOfFile: workspacePath + "/appicon.png") {
+        // Try to load directly from the bundle
+        if let loadedImage = NSImage(named: "appicon") {
             self.qrImage = loadedImage
             return
         }
