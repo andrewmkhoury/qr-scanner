@@ -5,7 +5,7 @@
 
 # Set variables
 APP_NAME="QR Scanner"
-APP_VERSION="1.0.1"
+APP_VERSION="1.0.2"
 APP_BUILD="1"
 APP_BUNDLE_ID="com.andrewmkhoury.qrscreenscanner"
 APP_COPYRIGHT="Copyright © 2023 Andrew Khoury. All rights reserved."
