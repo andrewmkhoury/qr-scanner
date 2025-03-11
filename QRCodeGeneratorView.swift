@@ -1,5 +1,74 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
+import AppKit
+
+// NSTextField wrapper for better input handling
+struct MacOSTextField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var isMultiline: Bool = true
+    
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
+        
+        textView.delegate = context.coordinator
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        textView.textColor = NSColor.labelColor
+        textView.drawsBackground = false
+        textView.isRichText = false
+        
+        // Important for input handling
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDataDetectionEnabled = false
+        textView.isAutomaticLinkDetectionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        
+        // Initialize with the current text
+        textView.string = text
+        
+        // Enable scrolling if multiline
+        scrollView.hasVerticalScroller = isMultiline
+        scrollView.hasHorizontalScroller = false
+        
+        // Set placeholder if empty
+        if text.isEmpty {
+            textView.placeholderString = placeholder
+        }
+        
+        return scrollView
+    }
+    
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+        
+        // Only update if the text has changed from an external source
+        if textView.string != text {
+            textView.string = text
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+    
+    class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        
+        init(text: Binding<String>) {
+            self.text = text
+        }
+        
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            self.text.wrappedValue = textView.string
+        }
+    }
+}
 
 struct QRCodeGeneratorView: View {
     @State private var inputText: String = ""
@@ -7,6 +76,7 @@ struct QRCodeGeneratorView: View {
     @State private var isImageGenerated = false
     @State private var errorMessage: String? = nil
     @State private var showCopyFeedback: Bool = false
+    @FocusState private var isInputFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
     
     private let context = CIContext()
@@ -30,9 +100,9 @@ struct QRCodeGeneratorView: View {
                 Text("Enter text or URL:")
                     .font(.subheadline)
                 
-                TextEditor(text: $inputText)
+                // Use our custom MacOSTextField for reliable input handling
+                MacOSTextField(text: $inputText, placeholder: "Enter text or URL", isMultiline: true)
                     .frame(height: 100)
-                    .padding(5)
                     .background(Color.secondary.opacity(0.1))
                     .cornerRadius(6)
                     .overlay(
@@ -40,6 +110,7 @@ struct QRCodeGeneratorView: View {
                             .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                     )
             }
+            .padding(.horizontal)
             
             // Generate button
             Button(action: generateQRCode) {

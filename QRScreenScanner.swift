@@ -424,6 +424,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if a window already exists and just bring it forward
         if let existingWindow = qrCodeWindow, existingWindow.isVisible {
             existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
             return
         }
         
@@ -439,9 +440,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isReleasedWhenClosed = false
         
-        // Set window to float above others and stay visible when app is not focused
-        window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // Configure window for proper keyboard input handling
+        window.level = .normal // Change from .floating for better input handling
+        window.collectionBehavior = [.fullScreenPrimary]
         
         // Make window delegate self to handle window closing
         window.delegate = self
@@ -460,9 +461,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
         
         // Store the window reference
         self.qrCodeWindow = window
+        
+        // After a brief delay, bring the window to front and activate input
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
