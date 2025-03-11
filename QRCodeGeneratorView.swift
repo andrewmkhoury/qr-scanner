@@ -6,6 +6,7 @@ struct QRCodeGeneratorView: View {
     @State private var qrCodeImage: NSImage? = nil
     @State private var isImageGenerated = false
     @State private var errorMessage: String? = nil
+    @State private var showCopyFeedback: Bool = false
     @Environment(\.colorScheme) private var colorScheme
     
     private let context = CIContext()
@@ -14,7 +15,7 @@ struct QRCodeGeneratorView: View {
     var body: some View {
         VStack(spacing: 20) {
             // App icon and title at the top
-            Image("appicon")
+            Image("images/app-icon")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 60, height: 60)
@@ -71,15 +72,29 @@ struct QRCodeGeneratorView: View {
                         .background(colorScheme == .dark ? Color.white : Color.white)
                         .cornerRadius(10)
                     
-                    // Save image button
-                    Button(action: saveQRCodeImage) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.down")
-                            Text("Save QR Code")
+                    // Action buttons
+                    HStack(spacing: 15) {
+                        // Copy image button
+                        Button(action: copyQRCodeImage) {
+                            HStack {
+                                Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
+                                Text(showCopyFeedback ? "Copied!" : "Copy")
+                            }
+                            .padding()
+                            .background(showCopyFeedback ? Color.green.opacity(0.2) : Color.secondary.opacity(0.1))
+                            .cornerRadius(8)
                         }
-                        .padding()
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(8)
+                        
+                        // Save image button
+                        Button(action: saveQRCodeImage) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("Save")
+                            }
+                            .padding()
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
                 }
             }
@@ -120,6 +135,22 @@ struct QRCodeGeneratorView: View {
             }
         } else {
             errorMessage = "Failed to generate QR code"
+        }
+    }
+    
+    private func copyQRCodeImage() {
+        guard let image = qrCodeImage else { return }
+        
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([image])
+        
+        // Show feedback
+        showCopyFeedback = true
+        
+        // Hide feedback after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            showCopyFeedback = false
         }
     }
     

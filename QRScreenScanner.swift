@@ -421,6 +421,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("Create QR Code menu item clicked")
         }
         
+        // Check if a window already exists and just bring it forward
+        if let existingWindow = qrCodeWindow, existingWindow.isVisible {
+            existingWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+        
         // Create and configure the QR code creation window
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 450),
@@ -431,7 +437,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         window.title = "Create QR Code"
         window.center()
-        window.isReleasedWhenClosed = true
+        window.isReleasedWhenClosed = false
+        
+        // Set window to float above others and stay visible when app is not focused
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        
+        // Make window delegate self to handle window closing
+        window.delegate = self
         
         // Use system background color for proper dark mode support
         window.backgroundColor = NSColor.windowBackgroundColor
@@ -447,6 +460,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        
+        // Store the window reference
+        self.qrCodeWindow = window
     }
 }
 
