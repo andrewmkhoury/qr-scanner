@@ -12,43 +12,28 @@ struct MacOSTextField: NSViewRepresentable {
         let scrollView = NSTextView.scrollableTextView()
         let textView = scrollView.documentView as! NSTextView
         
+        // Basic configuration
         textView.delegate = context.coordinator
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         textView.textColor = NSColor.labelColor
-        textView.drawsBackground = false
-        textView.isRichText = false
+        textView.drawsBackground = true
+        textView.backgroundColor = NSColor.textBackgroundColor
         
-        // Important for input handling
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDataDetectionEnabled = false
-        textView.isAutomaticLinkDetectionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        
-        // Initialize with the current text
-        textView.string = text
-        
-        // Enable scrolling if multiline
-        scrollView.hasVerticalScroller = isMultiline
-        scrollView.hasHorizontalScroller = false
-        
-        // Set placeholder using attributed string instead of placeholderString
-        if text.isEmpty {
-            let placeholderAttrString = NSAttributedString(
-                string: placeholder,
-                attributes: [
-                    .foregroundColor: NSColor.placeholderTextColor,
-                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize)
-                ]
-            )
-            textView.textStorage?.setAttributedString(placeholderAttrString)
-            
-            // Add a special flag to our coordinator to indicate this is a placeholder
+        // Initialize with the current text or placeholder
+        if !text.isEmpty {
+            textView.string = text
+        } else {
+            textView.string = placeholder
+            textView.textColor = NSColor.placeholderTextColor
             context.coordinator.isShowingPlaceholder = true
         }
+        
+        // Set up scrolling
+        scrollView.hasVerticalScroller = isMultiline
+        scrollView.hasHorizontalScroller = false
         
         return scrollView
     }
@@ -57,51 +42,48 @@ struct MacOSTextField: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         
         // Only update if the text has changed from an external source
+        // and we're not showing a placeholder
         if textView.string != text && !context.coordinator.isShowingPlaceholder {
             textView.string = text
-        }
-        
-        // Handle placeholder visibility
-        if text.isEmpty && !context.coordinator.isShowingPlaceholder {
-            let placeholderAttrString = NSAttributedString(
-                string: placeholder,
-                attributes: [
-                    .foregroundColor: NSColor.placeholderTextColor,
-                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize)
-                ]
-            )
-            textView.textStorage?.setAttributedString(placeholderAttrString)
-            context.coordinator.isShowingPlaceholder = true
         }
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, placeholder: placeholder)
     }
     
     class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
+        var placeholder: String
         var isShowingPlaceholder = false
         
-        init(text: Binding<String>) {
+        init(text: Binding<String>, placeholder: String) {
             self.text = text
+            self.placeholder = placeholder
         }
         
+        // Handle click or tab into the text field
         func textDidBeginEditing(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            
-            // Ensure keyboard focus
-            NSApp.activate(ignoringOtherApps: true)
             
             // Clear placeholder when editing begins
             if isShowingPlaceholder {
                 textView.string = ""
+                textView.textColor = NSColor.labelColor
                 isShowingPlaceholder = false
+            }
+            
+            // Ensure keyboard focus
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
             }
         }
         
+        // Handle text changes
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            
+            // Update the binding with the new text
             isShowingPlaceholder = false
             self.text.wrappedValue = textView.string
         }
