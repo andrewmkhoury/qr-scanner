@@ -425,31 +425,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let existingWindow = qrCodeWindow, existingWindow.isVisible {
             print("Using existing QR Code window")
             existingWindow.makeKeyAndOrderFront(nil)
-            
-            // Try to make text field first responder
-            if let scrollView = existingWindow.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
-               let textView = scrollView.documentView as? NSTextView {
-                existingWindow.makeFirstResponder(textView)
-                print("Set existing textView as first responder")
-            }
-            
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        } else if let existingWindow = qrCodeWindow {
-            print("Existing window found but not visible - making visible")
-            existingWindow.makeKeyAndOrderFront(nil)
-            
-            // Try to make text field first responder
-            if let scrollView = existingWindow.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
-               let textView = scrollView.documentView as? NSTextView {
-                existingWindow.makeFirstResponder(textView)
-                print("Set existing textView as first responder")
-            }
-            
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         
+        // Always create a new window to avoid issues with reused windows
         print("Creating new QR Code window")
         
         // Create and configure the QR code creation window
@@ -463,22 +443,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Create QR Code"
         window.center()
         
-        // Essential: window must not be released when closed!
-        window.isReleasedWhenClosed = false
-        print("Setting isReleasedWhenClosed to false")
+        // The window can be released when closed
+        window.isReleasedWhenClosed = true
         
-        // Configure window for proper keyboard input handling
-        // Use normal window level for better keyboard handling
+        // Use standard window settings - floating windows can have keyboard focus issues
         window.level = .normal
-        print("Setting window level to normal")
-        
-        // Configure window behavior to work well with keyboard focus
-        window.collectionBehavior = [.moveToActiveSpace]
-        print("Setting window collection behavior")
         
         // Make window delegate self to handle window closing
         window.delegate = self
-        print("Window delegate set")
         
         // Use system background color for proper dark mode support
         window.backgroundColor = NSColor.windowBackgroundColor
@@ -486,52 +458,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Respect system appearance setting
         window.appearance = NSAppearance.current
         
-        print("Creating QRCodeGeneratorView")
-        
         // Create SwiftUI QRCodeGenerator view and host it in the window
         let qrCodeGeneratorView = QRCodeGeneratorView()
-        print("QRCodeGeneratorView created successfully")
-        
         let hostingView = NSHostingView(rootView: qrCodeGeneratorView)
-        print("NSHostingView created successfully")
-        
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 450)
         hostingView.autoresizingMask = [.width, .height]
         
         window.contentView = hostingView
-        print("ContentView set successfully")
         
-        // Store the window reference before making it visible
+        // Store the window reference
         self.qrCodeWindow = window
-        print("Window reference stored")
         
-        // Make key window before showing it
-        window.makeKey()
-        print("Window made key")
-        
-        // Make window visible
+        // Show the window
         window.makeKeyAndOrderFront(nil)
-        print("Window ordered front")
-        
-        // Explicitly activate app to ensure it has focus
         NSApp.activate(ignoringOtherApps: true)
-        print("App activated")
-        
-        // After a brief delay, look for text view and make it first responder
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Find the NSScrollView containing the text view
-            if let scrollView = window.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
-               let textView = scrollView.documentView as? NSTextView {
-                window.makeFirstResponder(textView)
-                print("Made text view first responder after delay")
-            } else {
-                print("Could not find text view to make first responder")
-            }
-            
-            // Make sure window is key and front
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
     }
 }
 
@@ -575,67 +515,16 @@ extension AppDelegate {
 // MARK: - NSWindowDelegate
 extension AppDelegate: NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        print("Window should close delegate method called for: \(sender.title)")
-        
-        // Special handling for QR Code generator window
-        if sender.title == "Create QR Code" {
-            print("QR Code generator window - keeping window alive")
-            
-            // Just hide the window instead of closing it
-            sender.orderOut(nil)
-            
-            // Return false to prevent the standard close behavior
-            return false
-        }
-        
-        // For other windows, proceed with normal closure handling
-        print("Standard window closing procedure")
-        
-        // Get a strong reference to content view and all subviews
-        if let contentView = sender.contentView {
-            // Disable all interactive elements first
-            for subview in contentView.subviews {
-                if let button = subview as? NSButton {
-                    print("Removing button target and action")
-                    button.target = nil
-                    button.action = nil
-                } else if let control = subview as? NSControl {
-                    print("Disabling control")
-                    control.isEnabled = false
-                }
-            }
-        }
-        
-        // Use orderOut instead of close to avoid the close animation
-        // that might trigger the segmentation fault
-        DispatchQueue.main.async {
-            print("Ordering window out instead of closing")
-            sender.orderOut(nil)
-            
-            // Create a timer to finish cleanup after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("Final cleanup completed")
-            }
-        }
-        
-        // Return false to prevent the standard close behavior
-        // We'll handle closing ourselves with orderOut
-        return false
+        // Simply allow standard window closing behavior
+        return true
     }
     
-    // This method was getting called but might be triggering the crash
-    // Keep it for diagnostics but make it do minimal work
     func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else {
-            print("Window will close notification received - window not found")
-            return
-        }
+        guard let window = notification.object as? NSWindow else { return }
         
-        print("Window will close notification received for: \(window.title)")
-        
-        // Special handling for QR Code generator window
+        // If the QR code window is closing, clear the reference
         if window.title == "Create QR Code" {
-            print("QR Code generator window closing - will be preserved for reuse")
+            self.qrCodeWindow = nil
         }
     }
 } 
