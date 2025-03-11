@@ -39,7 +39,9 @@ let package = Package(
                 "build_app.sh",
                 "create_simple_background.sh",
                 "QRScreenScanner.dmg",
-                "BUILD.md"
+                "BUILD.md",
+                "QRScreenScanner_v1.0.0.dmg",
+                "QRScreenScanner_v1.0.1.dmg",
             ],
             resources: [
                 .process("AppIcon.icns"),

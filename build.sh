@@ -68,6 +68,7 @@ cp "QRScreenScanner.swift" "${TEMP_APP}/Contents/Resources/Sources/"
 cp "QRHighlightView.swift" "${TEMP_APP}/Contents/Resources/Sources/"
 cp "CaptureWindowController.swift" "${TEMP_APP}/Contents/Resources/Sources/"
 cp "SmartModeController.swift" "${TEMP_APP}/Contents/Resources/Sources/"
+cp "QRCodeGeneratorView.swift" "${TEMP_APP}/Contents/Resources/Sources/"
 cp "main.swift" "${TEMP_APP}/Contents/Resources/Sources/"
 
 # Create Info.plist

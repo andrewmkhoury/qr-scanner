@@ -66,6 +66,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set up the menu for right-click
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Scan for QR Codes", action: #selector(statusItemClicked), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Create QR Code", action: #selector(createQRCode), keyEquivalent: "c"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -413,6 +414,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // No need to close the window as it's already ordered out
         }
+    }
+    
+    @objc func createQRCode() {
+        if debugMode {
+            print("Create QR Code menu item clicked")
+        }
+        
+        // Create and configure the QR code creation window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 450),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "Create QR Code"
+        window.center()
+        window.isReleasedWhenClosed = true
+        
+        // Use system background color for proper dark mode support
+        window.backgroundColor = NSColor.windowBackgroundColor
+        
+        // Respect system appearance setting
+        window.appearance = NSAppearance.current
+        
+        // Create SwiftUI QRCodeGenerator view and host it in the window
+        let qrCodeGeneratorView = QRCodeGeneratorView()
+        let hostingView = NSHostingView(rootView: qrCodeGeneratorView)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 450)
+        hostingView.autoresizingMask = [.width, .height]
+        
+        window.contentView = hostingView
+        window.makeKeyAndOrderFront(nil)
     }
 }
 
