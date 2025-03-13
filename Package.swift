@@ -18,20 +18,47 @@ let package = Package(
             dependencies: [],
             path: ".",
             exclude: [
+                // Documentation files
                 "README.md", 
-                "Info.plist", 
-                "create_icns.sh", 
-                "AppIcon.iconset", 
-                "docs",
-                "QRScreenScanner.xcodeproj",
                 "PACKAGING.md",
                 "LICENSE",
-                "QRScanner-screenshot.png",
-                "QRScreenScanner-Info.plist",
-                "*.sh",
-                "QRScreenScanner*.dmg",
                 "BUILD.md",
+                
+                // Configuration files
+                "Info.plist", 
+                "QRScreenScanner-Info.plist",
+                
+                // Asset files
+                "AppIcon.iconset", 
+                "QRScanner-screenshot.png",
+                
+                // Project files
+                "QRScreenScanner.xcodeproj",
+                "docs",
+                
+                // Shell scripts
+                "create_icns.sh", 
+                "build.sh",
+                "repackage.sh",
+                "repackage_pro.sh",
+                "update_app.sh",
+                "rebuild_test.sh",
+                "rebuild_with_fix.sh",
+                "test_app.sh",
+                "build_app.sh",
+                "create_simple_background.sh",
+                "update_version.sh",
+                
+                // DMG files
+                "QRScreenScanner.dmg",
+                "QRScreenScanner_v1.0.0.dmg",
+                "QRScreenScanner_v1.0.1.dmg",
+                "QRScreenScanner_v1.0.3.dmg",
+                "QRScreenScanner_v1.0.4.dmg",
+                
+                // Directories
                 "Config",
+                "test_view",
             ],
             resources: [
                 .process("AppIcon.icns"),
