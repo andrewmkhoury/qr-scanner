@@ -80,9 +80,6 @@ let package = Package(
                 "Config",
                 "test_view",
                 "QR Scanner.app",
-                
-                // Generated files
-                "exclude_list.txt",
             ],
             resources: [
                 .process("AppIcon.icns"),
