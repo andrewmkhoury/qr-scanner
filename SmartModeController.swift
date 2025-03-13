@@ -561,6 +561,14 @@ class SmartModeController: NSObject {
         
         let screenBounds = mainScreen.frame
         
+        // Get the main display ID for pixel-perfect coordinate transformation
+        let displayID = CGMainDisplayID()
+        let displayBounds = CGDisplayBounds(displayID)
+        
+        if debugMode {
+            print("Screen bounds: \(screenBounds), Display bounds: \(displayBounds)")
+        }
+        
         for observation in observations {
             // Only process barcode observations
             guard let barcodeObservation = observation as? VNBarcodeObservation else {
@@ -582,12 +590,15 @@ class SmartModeController: NSObject {
             
             if debugMode {
                 print("QR code found with payload: \(payloadCopy)")
+                print("Original bounding box: \(barcodeObservation.boundingBox)")
             }
             
             // Convert normalized coordinates to screen coordinates
             let boundingBox = barcodeObservation.boundingBox
             
-            // Convert from normalized coordinates (where y=0 is bottom) to screen coordinates (where y=0 is top)
+            // Vision framework provides normalized coordinates (0,0 at bottom left, 1,1 at top right)
+            // We need to convert to screen coordinates (0,0 at top left)
+            // First flip the y-coordinate to match screen coordinate system
             let normalizedRect = CGRect(
                 x: boundingBox.origin.x,
                 y: 1.0 - boundingBox.origin.y - boundingBox.height,
@@ -595,13 +606,21 @@ class SmartModeController: NSObject {
                 height: boundingBox.height
             )
             
-            // Scale to screen coordinates
+            if debugMode {
+                print("Normalized rect after y-flip: \(normalizedRect)")
+            }
+            
+            // Scale to the actual display bounds (this is crucial for pixel-perfect mapping)
             let screenRect = CGRect(
-                x: normalizedRect.origin.x * screenBounds.width,
-                y: normalizedRect.origin.y * screenBounds.height,
-                width: normalizedRect.width * screenBounds.width,
-                height: normalizedRect.height * screenBounds.height
+                x: normalizedRect.origin.x * displayBounds.width + displayBounds.origin.x,
+                y: normalizedRect.origin.y * displayBounds.height + displayBounds.origin.y,
+                width: normalizedRect.width * displayBounds.width,
+                height: normalizedRect.height * displayBounds.height
             )
+            
+            if debugMode {
+                print("Final screen rect: \(screenRect)")
+            }
             
             // Store the QR code information
             qrCodesFound.append((rect: screenRect, payload: payloadCopy))

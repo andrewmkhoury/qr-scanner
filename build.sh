@@ -13,6 +13,7 @@ APP_BUILD="$BUILD_NUMBER"
 APP_BUNDLE_ID="com.andrewmkhoury.qrscreenscanner"
 APP_COPYRIGHT="$COPYRIGHT"
 DMG_NAME="QRScreenScanner_v${APP_VERSION}"
+ZIP_NAME="QRScreenScanner_v${APP_VERSION}"
 TEMP_APP="${APP_NAME}.app"
 TEMP_DIR="temp_dmg"
 BUILD_DIR=".build/release"
@@ -24,7 +25,7 @@ echo ""
 
 # Clean up any previous temporary files
 echo "Cleaning up previous temporary files..."
-rm -rf "${TEMP_APP}" "${TEMP_DIR}" "${DMG_NAME}.dmg"
+rm -rf "${TEMP_APP}" "${TEMP_DIR}" "${DMG_NAME}.dmg" "${ZIP_NAME}.zip"
 
 # Check for and remove problematic symlinks
 echo "Checking for problematic symlinks..."
@@ -130,20 +131,31 @@ cp -R "${TEMP_APP}" "${TEMP_DIR}/"
 echo "Creating Applications folder symlink..."
 ln -s /Applications "${TEMP_DIR}/Applications"
 
-# Create DMG
-echo "Creating DMG file..."
-hdiutil create -volname "QR Screen Scanner" -srcfolder "${TEMP_DIR}" -ov -format UDZO "${DMG_NAME}.dmg"
+# Create a simpler DMG (more compatible)
+echo "Creating DMG file using simpler format (better for GitHub)..."
+hdiutil create -volname "QR Screen Scanner" -srcfolder "${TEMP_DIR}" -ov -format UDZO -imagekey zlib-level=9 "${DMG_NAME}-temp.dmg"
+
+# Convert to read-only format
+echo "Converting DMG to read-only format..."
+hdiutil convert "${DMG_NAME}-temp.dmg" -format UDRO -o "${DMG_NAME}.dmg"
+rm "${DMG_NAME}-temp.dmg"
+
+# Create ZIP archive (more compatible for distribution without code signing)
+echo "Creating ZIP archive..."
+ditto -c -k --keepParent "${TEMP_APP}" "${ZIP_NAME}.zip"
 
 # Clean up
 echo "Cleaning up temporary files..."
-rm -rf "${TEMP_DIR}"
+rm -rf "${TEMP_DIR}" "${TEMP_APP}"
 
 echo ""
 echo "=== Build Complete ==="
 echo "DMG file created: ${DMG_NAME}.dmg"
+echo "ZIP file created: ${ZIP_NAME}.zip"
 echo ""
-echo "To test the app:"
-echo "1. Mount the DMG by double-clicking it"
-echo "2. Run the app from the mounted volume"
+echo "DISTRIBUTION RECOMMENDATION:"
+echo "For GitHub releases, include both the DMG and ZIP files."
+echo "The DMG should now work with right-click > Open after downloading."
+echo "If users still encounter issues, instruct them to use the ZIP file instead."
 echo ""
 echo "Done!" 

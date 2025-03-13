@@ -146,9 +146,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             smartModeController = nil
         }
         
-        // If for any reason qrGeneratorWindow still exists, just null it - don't try to access it
-        qrGeneratorWindow = nil
-        
         if debugMode {
             print("Creating new SmartModeController")
         }
@@ -568,16 +565,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func emergencyReset() {
         if debugMode {
             print("=== EMERGENCY RESET INITIATED ===")
+            print("Performing complete application state reset")
             print("Current SmartModeController: \(String(describing: smartModeController))")
         }
         
-        // Clean up QR Generator window properly
+        // Instead of cleaning up QR Generator window, just store a reference to it if it exists
+        var preservedQRGeneratorWindow: NSWindow? = nil
         if let window = qrGeneratorWindow {
-            safelyCleanupWindow(window)
-            window.close()
+            if debugMode {
+                print("Preserving QR Generator window during reset")
+            }
+            // Save the window reference to restore it after reset
+            preservedQRGeneratorWindow = window
+        } else {
+            if debugMode {
+                print("QR Generator window was already nil")
+            }
         }
         
-        // Clear reference
+        // Temporarily remove reference (will restore if needed)
         qrGeneratorWindow = nil
         
         // Clean up SmartModeController
@@ -592,10 +598,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if debugMode {
                 print("SmartModeController stopped during emergency reset")
             }
+        } else {
+            if debugMode {
+                print("No SmartModeController to clean up")
+            }
+        }
+        
+        // Restore QR Generator window reference if it was preserved
+        if let preservedWindow = preservedQRGeneratorWindow {
+            if debugMode {
+                print("Restoring QR Generator window after reset")
+            }
+            qrGeneratorWindow = preservedWindow
         }
         
         if debugMode {
             print("Emergency reset complete")
+            print("SmartModeController after reset: \(String(describing: smartModeController))")
+            print("QR Generator window after reset: \(String(describing: qrGeneratorWindow))")
         }
     }
 }
