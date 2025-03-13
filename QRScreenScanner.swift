@@ -4,6 +4,7 @@ import AppKit
 import Cocoa
 import Carbon.HIToolbox
 import AVFoundation
+// We're now using the QRCodeGeneratorView from the separate file
 
 struct QRScreenScanner: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -18,15 +19,21 @@ struct QRScreenScanner: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     private var smartModeController: SmartModeController?
-    private let debugMode = true // Enable debug mode for additional logging
+    private var debugMode = false // Default to false, will check command line args
     
     // Add a property to store the QR code window reference
     var qrCodeWindow: NSWindow?
     
+    // Add a property to store the QR code generator window reference
+    private var qrGeneratorWindow: NSWindow?
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Check for debug flag in command line arguments
+        debugMode = CommandLine.arguments.contains("--debug")
+        
         if debugMode {
             print("Application did finish launching with debug mode enabled")
         }
@@ -40,7 +47,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Use system QR code icon
             statusBarIcon = NSImage(systemSymbolName: "qrcode", accessibilityDescription: "QR Scanner")
-            print("Using system QR code icon for status bar")
+            if debugMode {
+                print("Using system QR code icon for status bar")
+            }
             
             // Resize the image to fit in the status bar (16x16 or 18x18 is typical)
             if statusBarIcon != nil {
@@ -65,90 +74,123 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Set up the menu for right-click
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Scan for QR Codes", action: #selector(statusItemClicked), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Scan for QR Codes", action: #selector(scanQRCodeAction), keyEquivalent: "s"))
         menu.addItem(NSMenuItem(title: "Create QR Code", action: #selector(createQRCode), keyEquivalent: "c"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
+        
+        // Set the application icon for dock and Command+Tab switcher
+        setApplicationIcon()
     }
     
     @objc func statusItemClicked() {
         // Directly scan for QR codes when the status item is clicked
-        scanForQRCodes()
+        scanQRCodeAction()
         
         if debugMode {
-            print("Status item clicked, scanning for QR codes")
+            print("Status item clicked, initiating QR code scan")
         }
+    }
+    
+    @objc func scanQRCodeAction() {
+        if debugMode {
+            print("Scan QR Codes action triggered")
+        }
+        
+        // Call the main scan function
+        scanForQRCodes()
     }
     
     func scanForQRCodes() {
         if debugMode {
-            print("scanForQRCodes called")
+            print("=== DEBUG: scanForQRCodes called ===")
+            print("Thread is main: \(Thread.isMainThread)")
         }
         
-        // First, set a flag to indicate we're in the process of scanning
-        let isRescanning = smartModeController != nil
-        
-        // Clean up any existing smart mode controller
-        if let controller = smartModeController {
-            if debugMode {
-                print("Stopping existing smart mode controller")
-            }
-            
-            // Make sure we properly clean up the controller
-            // Use a local reference to avoid potential nil issues during cleanup
-            let localController = controller
-            
-            // First set our reference to nil to prevent any callbacks
-            smartModeController = nil
-            
-            // Then stop the controller on the main thread
+        // Ensure we're on the main thread
+        if !Thread.isMainThread {
             DispatchQueue.main.async {
-                localController.stopSmartMode()
-                print("Existing controller stopped")
+                self.scanForQRCodes()
             }
-            
-            // Small delay to ensure cleanup is complete - increased to 0.3 seconds
-            Thread.sleep(forTimeInterval: 0.3)
-            print("Cleanup delay completed")
+            return
         }
         
-        // Create a new controller
-        let newController = SmartModeController()
+        // *********************
+        // CRITICAL FIX: Always reset the entire application state before scanning
+        // This is a "nuclear option" but should prevent segmentation faults
+        // *********************
+        emergencyReset()
         
-        // Store the controller reference before setting up callbacks
+        // After the emergency reset, wait a moment then continue with a clean state
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if self.debugMode {
+                print("Continuing with scan after emergency reset")
+            }
+            self.startFreshScan()
+        }
+    }
+    
+    // Update the startFreshScan method with extra safeguards
+    private func startFreshScan() {
+        if debugMode {
+            print("Starting fresh scan with clean state")
+            print("SmartModeController: \(String(describing: smartModeController))")
+        }
+        
+        // Double-check SmartModeController is null
+        if smartModeController != nil {
+            if debugMode {
+                print("WARNING: SmartModeController still exists after reset - clearing it")
+            }
+            smartModeController = nil
+        }
+        
+        if debugMode {
+            print("Creating new SmartModeController")
+        }
+        
+        // Create controller with debug flag
+        let newController = SmartModeController(debugMode: debugMode)
+        
+        if debugMode {
+            print("Successfully created SmartModeController")
+        }
+        
+        // Store reference
         smartModeController = newController
         
+        // Set up callback
         if debugMode {
-            print("Created new SmartModeController")
-            smartModeController?.testCallback() // Test if callback is working
+            print("Setting up QR code detection callback")
         }
         
-        // Use strong reference to self to ensure the controller isn't deallocated
-        smartModeController?.onQRCodeDetected = { [self] payload in
-            if self.debugMode {
-                print("QR code callback triggered with payload: \(payload)")
-            }
-            // Capture self strongly to ensure the controller stays alive
-            self.handleQRCode(payload)
-        }
-        
-        if debugMode {
-            print("Set onQRCodeDetected callback")
-            smartModeController?.testCallback() // Test again after setting callback
-        }
-        
-        // Ensure we're on the main thread when toggling smart mode
-        // Add a small delay if we're rescanning to ensure previous cleanup is complete
-        let delay = isRescanning ? 0.2 : 0.0
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self = self, let controller = self.smartModeController else {
-                print("Controller was deallocated before activation")
+        smartModeController?.onQRCodeDetected = { [weak self] payload in
+            guard let self = self else {
+                print("ERROR: Self is nil in QR code detection callback")
                 return
             }
             
-            print("Smart mode toggled on")
+            if self.debugMode {
+                print("QR code detected with payload: \(payload)")
+            }
+            
+            // Handle QR code
+            self.handleQRCode(payload)
+        }
+        
+        // Start scanning with a delay for safety
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self, let controller = self.smartModeController else {
+                print("ERROR: Controller was deallocated before scanning could start")
+                return
+            }
+            
+            if self.debugMode {
+                print("Starting smart mode scanning")
+            }
+            
+            // Toggle smart mode
             controller.toggleSmartMode()
             
             if self.debugMode {
@@ -204,274 +246,377 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Clean up the smart mode controller first to prevent any callbacks during window operations
         if let controller = self.smartModeController {
             print("Stopping smart mode controller")
+            // Safely stop the controller
+            DispatchQueue.main.async {
             controller.stopSmartMode()
+                print("Smart mode controller stopped")
+                
+                // Set to nil after stopping to prevent any callbacks
             self.smartModeController = nil
+                
+                // Show the QR code window after controller is stopped
+                DispatchQueue.main.async {
+                    self.showQRCodeWindow(with: localPayload)
+                }
+            }
+        } else {
+            // No controller to stop, show window directly
+            showQRCodeWindow(with: localPayload)
         }
-        
-        // Show the QR code window after cleanup
-        showQRCodeWindow(with: localPayload)
     }
     
-    func showQRCodeWindow(with payload: String) {
-        print("Creating QR code window for payload: \(payload)")
-        
-        // Create a window with more modern dimensions
-        let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        let windowWidth: CGFloat = 400  // Adjusted width for the updated ResultView
-        let windowHeight: CGFloat = 450  // Adjusted height for the updated ResultView with character
-        
-        let windowRect = NSRect(
-            x: (screenRect.width - windowWidth) / 2,
-            y: (screenRect.height - windowHeight) / 2,
-            width: windowWidth,
-            height: windowHeight
-        )
-        
+    // MARK: - Window Management
+    // Centralized window creation method
+    private func createWindow(withTitle title: String, size: NSSize) -> NSWindow {
         let window = NSWindow(
-            contentRect: windowRect,
+            contentRect: NSRect(
+                x: 0, 
+                y: 0, 
+                width: size.width, 
+                height: size.height
+            ),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         
-        // Set up window delegate to handle the close button in the title bar
+        window.title = title
+        window.center()
+        window.isReleasedWhenClosed = false // We'll handle this manually
         window.delegate = self
         
-        window.title = "QR Code Detected"
-        window.isReleasedWhenClosed = true
+        if debugMode {
+            print("Created window: \(title)")
+        }
         
-        // Use system background color for proper dark mode support
-        window.backgroundColor = NSColor.windowBackgroundColor
+        return window
+    }
+    
+    // Safe cleanup method for any window
+    private func safelyCleanupWindow(_ window: NSWindow) {
+        if debugMode {
+            print("Safely cleaning up window: \(window.title)")
+        }
         
-        // Respect system appearance setting
-        window.appearance = NSAppearance.current
+        // First disable all interaction with the window
+        window.ignoresMouseEvents = true
         
-        // Create SwiftUI ResultView and host it in the window
+        // Cleanup content view to break retain cycles
+        if let contentView = window.contentView {
+            // Remove all control actions
+            for subview in contentView.subviews {
+                if let control = subview as? NSControl {
+                    control.target = nil
+                    control.action = nil
+                }
+                // Remove from superview
+                subview.removeFromSuperview()
+            }
+        }
+        
+        // Replace with empty view
+        window.contentView = NSView(frame: NSRect.zero)
+        
+        // Order out (hide) the window
+        window.orderOut(nil)
+    }
+    
+    // QR Code Generator Window Management
+    @objc func createQRCode() {
+        if debugMode {
+            print("=== DEBUG: createQRCode called ===")
+            print("Thread is main: \(Thread.isMainThread)")
+        }
+        
+        // Ensure we're on the main thread
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.createQRCode()
+            }
+            return
+        }
+        
+        // If we already have a QR generator window visible, just bring it to front
+        if let existingWindow = qrGeneratorWindow, existingWindow.isVisible {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        
+        // First ensure any previous window is fully cleaned up
+        if let oldWindow = qrGeneratorWindow {
+            safelyCleanupWindow(oldWindow)
+            oldWindow.close()
+            qrGeneratorWindow = nil
+        }
+        
+        // Create new window
+        let window = createWindow(
+            withTitle: "Create QR Code",
+            size: NSSize(width: 400, height: 500)
+        )
+        
+        // Create and configure the SwiftUI hosting view
+        let qrView = QRCodeGeneratorView()
+        let hostingView = NSHostingView(rootView: qrView)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 500)
+        hostingView.autoresizingMask = [.width, .height]
+        
+        // Set the hosting view as the content
+        window.contentView = hostingView
+        
+        // Store reference
+        qrGeneratorWindow = window
+        
+        // Show window with animation
+        window.alphaValue = 0.0
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            window.animator().alphaValue = 1.0
+        })
+    }
+    
+    // QR Scan Result Window Management
+    func showQRCodeWindow(with payload: String) {
+        if debugMode {
+            print("Creating QR code result window for payload: \(payload)")
+        }
+        
+        // Ensure we're on the main thread
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.showQRCodeWindow(with: payload)
+            }
+            return
+        }
+        
+        // Clean up any existing window
+        if let oldWindow = qrCodeWindow {
+            safelyCleanupWindow(oldWindow)
+            oldWindow.close()
+            qrCodeWindow = nil
+        }
+        
+        // Define window dimensions
+        let windowWidth: CGFloat = 400
+        let windowHeight: CGFloat = 450
+        
+        // Create new window
+        let window = createWindow(
+            withTitle: "QR Code Detected",
+            size: NSSize(width: windowWidth, height: windowHeight)
+        )
+        
+        // Create and configure the result view
         let resultView = ResultView(result: payload)
         let hostingView = NSHostingView(rootView: resultView)
         hostingView.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
         hostingView.autoresizingMask = [.width, .height]
         
         window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
         window.level = .floating
         
-        // Add subtle animation when showing the window
+        // Store reference
+        qrCodeWindow = window
+        
+        // Show with animation
         window.alphaValue = 0.0
+        window.makeKeyAndOrderFront(nil)
+        
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.2
             window.animator().alphaValue = 1.0
         })
-        
-        // Store the window reference
-        self.qrCodeWindow = window
     }
     
-    @objc func closeQRCodeWindow(_ sender: NSButton) {
-        print("Close button clicked, attempting to close window safely")
-        
-        // Create a local reference to the window to avoid any reference issues
-        guard let windowRef = sender.window else {
-            print("Warning: Close button clicked but window reference is nil")
-            return
-        }
-        
-        // Store a weak reference to avoid retain cycles
-        weak var weakWindow = windowRef
-        
-        // First, remove all targets and actions from buttons to prevent callbacks
-        if let contentView = windowRef.contentView {
-            for subview in contentView.subviews {
-                if let button = subview as? NSButton {
-                    button.target = nil
-                    button.action = nil
-                }
-            }
-        }
-        
-        // Use orderOut instead of close to avoid potential segmentation faults
-        DispatchQueue.main.async {
-            print("Ordering window out from main thread")
-            weakWindow?.orderOut(nil)
-            
-            // Release the window after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                print("Window closed successfully")
-                // Set window to nil to ensure it's deallocated
-                if weakWindow != nil {
-                    print("Window reference still exists after closing")
-                } else {
-                    print("Window reference has been properly released")
-                }
-            }
-        }
-    }
-    
-    @objc func openURL(_ sender: NSButton) {
-        guard let window = sender.window else {
-            print("Warning: Open URL button clicked but window reference is nil")
-            return
-        }
-        
-        guard let contentView = window.contentView else {
-            print("Warning: Window content view is nil")
-            return
-        }
-        
-        // First try to get the payload field by tag
-        var payloadField = contentView.viewWithTag(100) as? NSTextField
-        
-        // If not found by tag, try by identifier
-        if payloadField == nil {
-            payloadField = contentView.subviews.first(where: { $0.identifier?.rawValue == "payload" }) as? NSTextField
-        }
-        
-        guard let field = payloadField, !field.stringValue.isEmpty else {
-            print("Failed to get payload for URL opening")
-            return
-        }
-        
-        let payload = field.stringValue
-        print("Preparing to open URL: \(payload)")
-        
-        // First close the window to avoid any interaction with it
-        window.orderOut(nil)
-        
-        // Create a local copy of the URL string
-        let urlString = String(payload)
-        
-        // Detach completely from the window and use a new task
-        DispatchQueue.global(qos: .userInitiated).async {
-            // Wait a moment to ensure window is gone
-            Thread.sleep(forTimeInterval: 0.5)
-            
-            // Then dispatch back to main for UI work
-            DispatchQueue.main.async {
-                if let url = URL(string: urlString) {
-                    print("Opening URL in separate process: \(url)")
-                    
-                    // Use a Process to open the URL instead of NSWorkspace
-                    let task = Process()
-                    task.launchPath = "/usr/bin/open"
-                    task.arguments = [url.absoluteString]
-                    
-                    do {
-                        try task.run()
-                        print("URL opened successfully via process")
-                    } catch {
-                        print("Error opening URL via process: \(error)")
-                        
-                        // Fallback to NSWorkspace as a last resort
-                        print("Trying NSWorkspace as fallback")
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-            }
-        }
-    }
-    
-    @objc func copyToClipboard(_ sender: NSButton) {
-        guard let window = sender.window else {
-            print("Warning: Copy button clicked but window reference is nil")
-            return
-        }
-        
-        guard let contentView = window.contentView else {
-            print("Warning: Window content view is nil")
-            return
-        }
-        
-        // First try to get the payload field by tag
-        var payloadField = contentView.viewWithTag(100) as? NSTextField
-        
-        // If not found by tag, try by identifier
-        if payloadField == nil {
-            payloadField = contentView.subviews.first(where: { $0.identifier?.rawValue == "payload" }) as? NSTextField
-        }
-        
-        guard let field = payloadField, !field.stringValue.isEmpty else {
-            print("Failed to get payload for clipboard")
-            return
-        }
-        
-        let payload = field.stringValue
-        print("Copying to clipboard: \(payload)")
-        
-        // First hide the window to avoid interaction with it
-        window.orderOut(nil)
-        
-        // Create a local copy of the payload
-        let localPayload = String(payload)
-        
-        // Copy to clipboard on a slight delay to ensure window is gone
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Copy to clipboard
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(localPayload, forType: .string)
-            
-            print("Copied to clipboard successfully")
-            
-            // No need to close the window as it's already ordered out
-        }
-    }
-    
-    @objc func createQRCode() {
+    // MARK: - NSWindowDelegate Implementation
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
         if debugMode {
-            print("Create QR Code menu item clicked")
+            print("=== DEBUG: windowShouldClose called ===")
+            print("Window title: \(sender.title)")
         }
         
-        // Check if a window already exists and just bring it forward
-        if let existingWindow = qrCodeWindow, existingWindow.isVisible {
-            print("Using existing QR Code window")
-            existingWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
+        // Determine which window is closing
+        if sender === qrGeneratorWindow {
+            if debugMode {
+                print("QR Generator window closing")
+            }
+            
+            // Clean up window
+            safelyCleanupWindow(sender)
+            
+            // Clear reference
+            qrGeneratorWindow = nil
+            
+            if debugMode {
+                print("QR Generator window cleanup complete")
+            }
+        }
+        else if sender === qrCodeWindow {
+            if debugMode {
+                print("QR Code result window closing")
+            }
+            
+            // Clean up smart mode controller
+            if let controller = smartModeController {
+                controller.stopSmartMode()
+                smartModeController = nil
+            }
+            
+            // Clean up window
+            safelyCleanupWindow(sender)
+            
+            // Clear reference
+            qrCodeWindow = nil
+            
+            if debugMode {
+                print("QR Code result window cleanup complete")
+            }
         }
         
-        // Always create a new window to avoid issues with reused windows
-        print("Creating new QR Code window")
+        // Return true to allow the window to close
+        return true
+    }
+    
+    // Called after the window is closed
+    func windowWillClose(_ notification: Notification) {
+        if debugMode {
+            print("Window will close notification received")
+        }
         
-        // Create and configure the QR code creation window
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 450),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
+        // No need to do anything here - everything is handled in windowShouldClose
+    }
+    
+    // Set the application icon for dock and Command+Tab switcher
+    private func setApplicationIcon() {
+        // For a menu bar app to show in dock, we need to change the activation policy
+        NSApp.setActivationPolicy(.regular)
+
+        // Try to load the app icon from various locations
+        var appIcon: NSImage? = nil
+
+        // First prioritize the appicon.png that's used in the dialogs for consistency
+        if let iconPath = Bundle.main.path(forResource: "appicon", ofType: "png") {
+            appIcon = NSImage(contentsOfFile: iconPath)
+            if debugMode {
+                print("Loaded cute app icon from appicon.png")
+            }
+        }
+
+        // If PNG not found in main bundle resources, try application directory
+        if appIcon == nil {
+            let projectDir = FileManager.default.currentDirectoryPath
+            let iconPath = projectDir + "/appicon.png"
+            if FileManager.default.fileExists(atPath: iconPath) {
+                appIcon = NSImage(contentsOfFile: iconPath)
+                if debugMode {
+                    print("Loaded cute app icon from project directory: \(iconPath)")
+                }
+            }
+        }
+
+        // Fall back to AppIcon.icns if appicon.png not found
+        if appIcon == nil, let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "icns") {
+            appIcon = NSImage(contentsOfFile: iconPath)
+            if debugMode {
+                print("Loaded app icon from AppIcon.icns")
+            }
+        }
+
+        // If still no icon found, use the system QR code symbol
+        if appIcon == nil, let qrSymbol = NSImage(systemSymbolName: "qrcode", accessibilityDescription: "QR Scanner") {
+            // Use the system symbol directly without modification
+            appIcon = qrSymbol
+            
+            if debugMode {
+                print("Using system QR code symbol for application icon as last resort")
+            }
+        }
+
+        // If an icon was found, set it as the application icon
+        if let icon = appIcon {
+            // Important: Don't set as template image for application icon
+            icon.isTemplate = false
+            
+            // Resize to appropriate icon size
+            let iconSize: CGFloat = 128  // Standard application icon size
+            let resizedIcon = NSImage(size: NSSize(width: iconSize, height: iconSize), flipped: false) { rect in
+                icon.draw(in: rect)
+                return true
+            }
+
+            NSApp.applicationIconImage = resizedIcon
+            if debugMode {
+                print("Set application icon for dock and Command+Tab switcher")
+            }
+        } else if debugMode {
+            print("Could not find application icon")
+            
+            // Print bundle paths for debugging
+            print("Bundle path: \(Bundle.main.bundlePath)")
+            print("Resource path: \(Bundle.main.resourcePath ?? "nil")")
+        }
+    }
+
+    // Update the emergency reset method to use our improved window cleanup method
+    private func emergencyReset() {
+        if debugMode {
+            print("=== EMERGENCY RESET INITIATED ===")
+            print("Performing complete application state reset")
+            print("Current SmartModeController: \(String(describing: smartModeController))")
+        }
         
-        window.title = "Create QR Code"
-        window.center()
+        // Instead of cleaning up QR Generator window, just store a reference to it if it exists
+        var preservedQRGeneratorWindow: NSWindow? = nil
+        if let window = qrGeneratorWindow {
+            if debugMode {
+                print("Preserving QR Generator window during reset")
+            }
+            // Save the window reference to restore it after reset
+            preservedQRGeneratorWindow = window
+        } else {
+            if debugMode {
+                print("QR Generator window was already nil")
+            }
+        }
         
-        // The window can be released when closed
-        window.isReleasedWhenClosed = true
+        // Temporarily remove reference (will restore if needed)
+        qrGeneratorWindow = nil
         
-        // Use standard window settings - floating windows can have keyboard focus issues
-        window.level = .normal
+        // Clean up SmartModeController
+        if let controller = smartModeController {
+            if debugMode {
+                print("Stopping SmartModeController during emergency reset")
+            }
+            
+            controller.stopSmartMode()
+            smartModeController = nil
+            
+            if debugMode {
+                print("SmartModeController stopped during emergency reset")
+            }
+        } else {
+            if debugMode {
+                print("No SmartModeController to clean up")
+            }
+        }
         
-        // Make window delegate self to handle window closing
-        window.delegate = self
+        // Restore QR Generator window reference if it was preserved
+        if let preservedWindow = preservedQRGeneratorWindow {
+            if debugMode {
+                print("Restoring QR Generator window after reset")
+            }
+            qrGeneratorWindow = preservedWindow
+        }
         
-        // Use system background color for proper dark mode support
-        window.backgroundColor = NSColor.windowBackgroundColor
-        
-        // Respect system appearance setting
-        window.appearance = NSAppearance.current
-        
-        // Create SwiftUI QRCodeGenerator view and host it in the window
-        let qrCodeGeneratorView = QRCodeGeneratorView()
-        let hostingView = NSHostingView(rootView: qrCodeGeneratorView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 450)
-        hostingView.autoresizingMask = [.width, .height]
-        
-        window.contentView = hostingView
-        
-        // Store the window reference
-        self.qrCodeWindow = window
-        
-        // Show the window
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if debugMode {
+            print("Emergency reset complete")
+            print("SmartModeController after reset: \(String(describing: smartModeController))")
+            print("QR Generator window after reset: \(String(describing: qrGeneratorWindow))")
+        }
     }
 }
 
@@ -508,23 +653,6 @@ extension AppDelegate {
         } catch {
             print("Failed to perform QR code detection: \(error)")
             return []
-        }
-    }
-}
-
-// MARK: - NSWindowDelegate
-extension AppDelegate: NSWindowDelegate {
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        // Simply allow standard window closing behavior
-        return true
-    }
-    
-    func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else { return }
-        
-        // If the QR code window is closing, clear the reference
-        if window.title == "Create QR Code" {
-            self.qrCodeWindow = nil
         }
     }
 } 
