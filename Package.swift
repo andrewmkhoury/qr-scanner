@@ -42,6 +42,7 @@ let package = Package(
                 "BUILD.md",
                 "QRScreenScanner_v1.0.0.dmg",
                 "QRScreenScanner_v1.0.1.dmg",
+                "QRScreenScanner_v1.0.3.dmg",
             ],
             resources: [
                 .process("AppIcon.icns"),
