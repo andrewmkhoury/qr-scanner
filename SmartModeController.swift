@@ -11,18 +11,11 @@ class SmartModeController: NSObject {
     private var qrCodeLocations: [String: CGRect] = [:]
     private var qrCodesList: [String] = []
     private var globalClickMonitor: Any?
-    private var debugMode: Bool
     var onQRCodeDetected: ((String) -> Void)?
-    
-    init(debugMode: Bool = false) {
-        self.debugMode = debugMode
-        super.init()
-    }
+    private var debugMode = false
     
     func toggleSmartMode() {
-        if debugMode {
-            print("Toggle smart mode called, current state: \(isActive ? "active" : "inactive")")
-        }
+        print("Toggle smart mode called, current state: \(isActive ? "active" : "inactive")")
         
         // If we're already active, stop first
         if isActive {
@@ -35,132 +28,139 @@ class SmartModeController: NSObject {
         isActive = !isActive
         
         if isActive {
-            if debugMode {
-                print("Starting smart mode")
-            }
+            print("Starting smart mode")
             startSmartMode()
         } else {
-            if debugMode {
-                print("Smart mode toggled off")
-            }
+            print("Smart mode toggled off")
         }
     }
     
     func startSmartMode() {
-        if !isActive {
-            if debugMode {
-                print("Cannot start smart mode - controller is not active")
-            }
+        print("Starting smart mode initialization")
+        
+        // Make sure we're active
+        guard isActive else {
+            print("Cannot start smart mode - controller is not active")
             return
         }
         
-        if debugMode {
-            print("Starting smart mode initialization")
+        // Clear any existing data
+        qrCodeLocations.removeAll()
+        qrCodesList.removeAll()
+        
+        // Clear any existing highlights on the main thread
+        if Thread.isMainThread {
+            clearHighlights()
+        } else {
+            DispatchQueue.main.sync {
+                self.clearHighlights()
+            }
         }
         
-        // Clean up any existing resources first
-        performUICleanup()
-        
-        // If we already have a global click monitor, remove it first
-        if globalClickMonitor != nil {
-            if debugMode {
-                print("Removing existing global click monitor during initialization")
-            }
-            NSEvent.removeMonitor(globalClickMonitor!)
+        // Remove any existing global click monitor
+        if let monitor = globalClickMonitor {
+            print("Removing existing global click monitor during initialization")
+            NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
         }
         
-        // Start scanning the screen
+        // Only scan the screen when Smart Mode is activated
+        print("Initialization complete, scanning screen")
         scanScreen()
-        
-        if debugMode {
-            print("Initialization complete, scanning screen")
-        }
     }
     
     func stopSmartMode() {
+        print("Stopping smart mode - cleaning up resources")
+        
+        // Deactivate first to prevent further scanning
         isActive = false
         
-        if debugMode {
-            print("Stopping smart mode - cleaning up resources")
-        }
+        // Clear data structures immediately to prevent access to stale data
+        qrCodeLocations.removeAll()
+        qrCodesList.removeAll()
         
-        // Stop timer
-        timer?.invalidate()
-        timer = nil
-        
-        // Remove global click monitor
-        if globalClickMonitor != nil {
-            if debugMode {
-                print("Removing global click monitor")
-            }
-            NSEvent.removeMonitor(globalClickMonitor!)
+        // Remove click monitor on the main thread
+        if let monitor = globalClickMonitor {
+            print("Removing global click monitor")
+            NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
         }
         
-        // Clean up UI resources on main thread
-        DispatchQueue.main.async { [weak self] in
-            self?.performUICleanup()
-            
-            if let self = self, self.debugMode {
-                print("Smart mode stopped and resources cleaned up")
+        // Perform UI cleanup on main thread
+        if Thread.isMainThread {
+            performUICleanup()
+        } else {
+            DispatchQueue.main.sync {
+                self.performUICleanup()
             }
         }
+        
+        // Wait a moment to ensure cleanup is complete
+        Thread.sleep(forTimeInterval: 0.1)
+        
+        print("Smart mode stopped and resources cleaned up")
     }
     
     private func setupGlobalClickMonitor() {
         // Remove existing monitor if any
-        if globalClickMonitor != nil {
-            if debugMode {
-                print("Removing existing global click monitor")
-            }
-            NSEvent.removeMonitor(globalClickMonitor!)
+        if let monitor = globalClickMonitor {
+            print("Removing existing global click monitor")
+            NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
         }
         
-        if debugMode {
-            print("Setting up new global click monitor")
-        }
+        print("Setting up new global click monitor")
         
-        // Create a new monitor for mouse down events
-        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            guard let self = self, self.isActive else {
-                if self?.debugMode == true {
-                    print("SmartModeController is no longer active or has been deallocated")
-                }
-                return
+        // Create a weak reference to self to avoid retain cycles
+        weak var weakSelf = self
+        
+        // Use a local variable to store the monitor before assigning to the property
+        let newMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { event in
+            // Get strong reference to self
+            guard let strongSelf = weakSelf, strongSelf.isActive else { 
+                print("SmartModeController is no longer active or has been deallocated")
+                return 
             }
             
-            if self.debugMode {
-                print("Global click detected at: \(NSEvent.mouseLocation)")
-            }
+            print("Global click detected at: \(NSEvent.mouseLocation)")
             
-            // Check if click is inside any of our detected QR codes
-            let clickLocation = NSEvent.mouseLocation
+            // Get the actual global mouse location for more accurate detection
+            let mouseLocation = NSEvent.mouseLocation
+            var clickedOnQRCode = false
+            var clickedPayload: String?
             
-            for (payload, rect) in self.qrCodeLocations {
-                if rect.contains(clickLocation) {
-                    if self.debugMode {
-                        print("Click detected inside QR code: \(payload)")
-                    }
-                    
-                    // Process on main thread
-                    DispatchQueue.main.async {
-                        if self.debugMode {
-                            print("Processing click on QR code: \(payload)")
-                        }
-                        
-                        // Handle the QR code
-                        self.handleQRCodeSelected(payload: payload)
-                    }
+            // Create a local copy of the QR code locations to avoid memory issues
+            let localQRCodeLocations = strongSelf.qrCodeLocations
+            
+            // Check if click is in any of our tracked QR code locations
+            for (payload, rect) in localQRCodeLocations {
+                if rect.contains(mouseLocation) {
+                    clickedOnQRCode = true
+                    clickedPayload = String(payload) // Create a local copy
+                    print("Click detected inside QR code: \(payload)")
                     break
                 }
             }
+            
+            if clickedOnQRCode, let payload = clickedPayload {
+                print("Processing click on QR code: \(payload)")
+                // Dispatch to main thread
+                DispatchQueue.main.async {
+                    // Check again if self is still active
+                    guard let strongSelf = weakSelf, strongSelf.isActive else { return }
+                    
+                    print("Handling QR code click on main thread")
+                    // Stop highlighting when a QR code is clicked
+                    strongSelf.clearHighlights()
+                    strongSelf.handleQRCodeSelected(payload: payload)
+                }
+            }
         }
         
-        if debugMode {
-            print("Global click monitor set up")
-        }
+        // Assign the monitor to the property
+        globalClickMonitor = newMonitor
+        
+        print("Global click monitor set up")
     }
     
     private func createQRWindow() {
@@ -291,7 +291,29 @@ class SmartModeController: NSObject {
         detectQRCodes(in: cgImage)
     }
     
-    // QR code detection
+    private func createScreenshot() -> CGImage? {
+        if debugMode {
+            print("Taking screenshot of main screen")
+        }
+        
+        // Get the main display ID
+        let displayID = CGMainDisplayID()
+        
+        // Create a screenshot of the entire screen
+        guard let screenshot = CGDisplayCreateImage(displayID) else {
+            if debugMode {
+                print("Failed to create screenshot")
+            }
+            return nil
+        }
+        
+        if debugMode {
+            print("Screenshot captured successfully")
+        }
+        
+        return screenshot
+    }
+    
     private func detectQRCodes(in image: CGImage) {
         // Run Vision request to detect barcodes
         let request = VNDetectBarcodesRequest()
@@ -330,8 +352,85 @@ class SmartModeController: NSObject {
                     return
                 }
                 
-                // Process QR code results
-                self.processQRCodeResults(observations: observations)
+                // Process QR code results - Using the approach from v1.0.1
+                var detectedQRCodes: [(rect: CGRect, payload: String)] = []
+                var localQRCodesList: [String] = []
+                var localQRCodeLocations: [String: CGRect] = [:]
+                
+                // Get the main screen for coordinate conversion
+                guard let mainScreen = NSScreen.main else {
+                    if self.debugMode {
+                        print("Failed to get main screen")
+                    }
+                    return
+                }
+                
+                let screenFrame = mainScreen.frame
+                
+                for observation in observations {
+                    guard let barcodeObservation = observation as? VNBarcodeObservation,
+                          barcodeObservation.symbology == .qr,
+                          let payload = barcodeObservation.payloadStringValue else {
+                        continue
+                    }
+                    
+                    // Make a local copy of the payload string
+                    let payloadCopy = String(payload)
+                    
+                    if self.debugMode {
+                        print("QR code found with payload: \(payloadCopy)")
+                        print("Original bounding box: \(barcodeObservation.boundingBox)")
+                    }
+                    
+                    // Get the bounding box in normalized coordinates
+                    let boundingBox = barcodeObservation.boundingBox
+                    
+                    // Vision framework provides normalized coordinates (0,0 at bottom left, 1,1 at top right)
+                    // Convert to screen coordinates (origin at bottom-left)
+                    let x = boundingBox.origin.x * screenFrame.width
+                    let y = boundingBox.origin.y * screenFrame.height
+                    let width = boundingBox.width * screenFrame.width
+                    let height = boundingBox.height * screenFrame.height
+                    
+                    // Add padding around the QR code
+                    let padding: CGFloat = 5
+                    let rect = NSRect(
+                        x: x - padding,
+                        y: y - padding,
+                        width: width + (padding * 2),
+                        height: height + (padding * 2)
+                    ).integral
+                    
+                    if self.debugMode {
+                        print("Final screen rect: \(rect)")
+                    }
+                    
+                    // Store the QR code information
+                    detectedQRCodes.append((rect: rect, payload: payloadCopy))
+                    localQRCodesList.append(payloadCopy)
+                    localQRCodeLocations[payloadCopy] = rect
+                    
+                    if self.debugMode {
+                        print("QR code at screen position: \(rect)")
+                    }
+                }
+                
+                // Update QR code data
+                self.qrCodesList = localQRCodesList
+                self.qrCodeLocations = localQRCodeLocations
+                
+                if self.debugMode {
+                    print("Found \(localQRCodesList.count) QR codes on screen")
+                }
+                
+                // Update UI with highlights if we found any QR codes
+                if !detectedQRCodes.isEmpty {
+                    self.updateHighlights(detectedQRCodes)
+                    self.updateQRCodesList()
+                    
+                    // Setup global click monitor after finding QR codes
+                    self.setupGlobalClickMonitor()
+                }
             }
         } catch {
             if debugMode {
@@ -509,141 +608,6 @@ class SmartModeController: NSObject {
         
         if debugMode {
             print("QR Code detection handling completed for: \(payload)")
-        }
-    }
-    
-    // MARK: - Screenshot and QR Processing
-    
-    // Create a screenshot of the main screen
-    private func createScreenshot() -> CGImage? {
-        if debugMode {
-            print("Taking screenshot of main screen")
-        }
-        
-        // Get the main display ID
-        let displayID = CGMainDisplayID()
-        
-        // Create a screenshot of the entire screen
-        guard let screenshot = CGDisplayCreateImage(displayID) else {
-            if debugMode {
-                print("Failed to create screenshot")
-            }
-            return nil
-        }
-        
-        if debugMode {
-            print("Screenshot captured successfully")
-        }
-        
-        return screenshot
-    }
-    
-    // Process the results from the barcode detection
-    private func processQRCodeResults(observations: [VNObservation]) {
-        if debugMode {
-            print("Processing \(observations.count) barcode observations")
-        }
-        
-        // Convert Vision results to QR code data
-        var qrCodesFound: [(rect: CGRect, payload: String)] = []
-        
-        // Temporary storage for new QR code payloads
-        var newQRCodesList: [String] = []
-        var newQRCodeLocations: [String: CGRect] = [:]
-        
-        // Get screen dimensions for coordinate conversion
-        guard let mainScreen = NSScreen.main else {
-            if debugMode {
-                print("Failed to get main screen")
-            }
-            return
-        }
-        
-        let screenBounds = mainScreen.frame
-        
-        // Get the main display ID for pixel-perfect coordinate transformation
-        let displayID = CGMainDisplayID()
-        let displayBounds = CGDisplayBounds(displayID)
-        
-        if debugMode {
-            print("Screen bounds: \(screenBounds), Display bounds: \(displayBounds)")
-        }
-        
-        for observation in observations {
-            // Only process barcode observations
-            guard let barcodeObservation = observation as? VNBarcodeObservation else {
-                continue
-            }
-            
-            // Only process QR codes
-            guard barcodeObservation.symbology == .qr else {
-                continue
-            }
-            
-            // Extract the payload
-            guard let payload = barcodeObservation.payloadStringValue else {
-                continue
-            }
-            
-            // Make a local copy of the payload string
-            let payloadCopy = String(payload)
-            
-            if debugMode {
-                print("QR code found with payload: \(payloadCopy)")
-                print("Original bounding box: \(barcodeObservation.boundingBox)")
-            }
-            
-            // Convert normalized coordinates to screen coordinates
-            let boundingBox = barcodeObservation.boundingBox
-            
-            // Vision framework provides normalized coordinates (0,0 at bottom left, 1,1 at top right)
-            // We need to convert to screen coordinates (0,0 at top left)
-            // First flip the y-coordinate to match screen coordinate system
-            let normalizedRect = CGRect(
-                x: boundingBox.origin.x,
-                y: 1.0 - boundingBox.origin.y - boundingBox.height,
-                width: boundingBox.width,
-                height: boundingBox.height
-            )
-            
-            if debugMode {
-                print("Normalized rect after y-flip: \(normalizedRect)")
-            }
-            
-            // Scale to the actual display bounds (this is crucial for pixel-perfect mapping)
-            let screenRect = CGRect(
-                x: normalizedRect.origin.x * displayBounds.width + displayBounds.origin.x,
-                y: normalizedRect.origin.y * displayBounds.height + displayBounds.origin.y,
-                width: normalizedRect.width * displayBounds.width,
-                height: normalizedRect.height * displayBounds.height
-            )
-            
-            if debugMode {
-                print("Final screen rect: \(screenRect)")
-            }
-            
-            // Store the QR code information
-            qrCodesFound.append((rect: screenRect, payload: payloadCopy))
-            newQRCodesList.append(payloadCopy)
-            newQRCodeLocations[payloadCopy] = screenRect
-            
-            if debugMode {
-                print("QR code at screen position: \(screenRect)")
-            }
-        }
-        
-        // Update QR code data
-        qrCodesList = newQRCodesList
-        qrCodeLocations = newQRCodeLocations
-        
-        if debugMode {
-            print("Found \(qrCodesList.count) QR codes on screen")
-        }
-        
-        // Update UI with highlights if we found any QR codes
-        if !qrCodesFound.isEmpty {
-            updateHighlights(qrCodesFound)
-            updateQRCodesList()
         }
     }
     
