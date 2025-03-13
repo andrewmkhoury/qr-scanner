@@ -106,20 +106,20 @@ struct ResultView: View {
         }
         
         // Try bundle path
-        if let loadedImage = NSImage(contentsOfFile: Bundle.main.bundlePath + "/Contents/Resources/appicon.png") {
+        if let loadedImage = NSImage(contentsOfFile: Bundle.main.bundlePath + "/Contents/Resources/images/app-icon.png") {
             self.qrImage = loadedImage
             return
         }
         
         // Try current directory
         if let projectPath = FileManager.default.currentDirectoryPath as String?,
-           let loadedImage = NSImage(contentsOfFile: projectPath + "/appicon.png") {
+           let loadedImage = NSImage(contentsOfFile: projectPath + "/images/app-icon.png") {
             self.qrImage = loadedImage
             return
         }
         
         // Try to load directly from the bundle
-        if let loadedImage = NSImage(named: "appicon") {
+        if let loadedImage = NSImage(named: "app-icon") {
             self.qrImage = loadedImage
             return
         }

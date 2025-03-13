@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Script to repackage QR Screen Scanner app
-# Created by Claude for Andrew Khoury
+# Script to build QR Screen Scanner app with the updated ResultView.swift
+# This is a simplified version that doesn't rely on swift build
 
 # Set variables
 APP_NAME="QR Scanner"
@@ -14,15 +14,9 @@ TEMP_APP="${APP_NAME}.app"
 TEMP_DIR="temp_dmg"
 
 # Print status message
-echo "=== QR Screen Scanner Repackaging Tool ==="
+echo "=== QR Screen Scanner Build Tool ==="
 echo "Version: ${APP_VERSION} (Build ${APP_BUILD})"
 echo ""
-
-# Check if source files exist
-if [ ! -f "QRScreenScanner.swift" ] || [ ! -f "AppIcon.icns" ]; then
-    echo "Error: Source files not found!"
-    exit 1
-fi
 
 # Clean up any previous temporary files
 echo "Cleaning up previous temporary files..."
@@ -32,22 +26,21 @@ rm -rf "${TEMP_APP}" "${TEMP_DIR}" "${DMG_NAME}.dmg"
 echo "Creating app bundle structure..."
 mkdir -p "${TEMP_APP}/Contents/"{MacOS,Resources}
 
-# Copy executable (assuming it's already built)
-echo "Copying executable..."
-if [ -f ".build/release/QRScreenScanner" ]; then
-    cp ".build/release/QRScreenScanner" "${TEMP_APP}/Contents/MacOS/"
+# Copy executable from existing app
+echo "Copying executable from existing app..."
+if [ -d "QR Scanner.app" ]; then
+    cp "QR Scanner.app/Contents/MacOS/QR Scanner" "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
     chmod +x "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
 else
-    echo "Warning: Executable not found. You may need to build the project first."
-    echo "Creating a placeholder executable..."
-    touch "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
-    chmod +x "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
+    echo "Error: Existing app not found!"
+    exit 1
 fi
 
 # Copy resources
 echo "Copying resources..."
 cp "AppIcon.icns" "${TEMP_APP}/Contents/Resources/"
 cp "images/app-icon.png" "${TEMP_APP}/Contents/Resources/"
+cp "ResultView.swift" "${TEMP_APP}/Contents/Resources/"
 
 # Create Info.plist
 echo "Creating Info.plist..."
@@ -117,12 +110,8 @@ echo ""
 echo "=== Packaging Complete ==="
 echo "DMG file created: ${DMG_NAME}.dmg"
 echo ""
-echo "To use this DMG in a GitHub release:"
-echo "1. Go to your GitHub repository"
-echo "2. Click on 'Releases'"
-echo "3. Click 'Draft a new release'"
-echo "4. Set the tag version to v${APP_VERSION}"
-echo "5. Upload the ${DMG_NAME}.dmg file"
-echo "6. Publish the release"
+echo "To test the app:"
+echo "1. Mount the DMG by double-clicking it"
+echo "2. Run the app from the mounted volume"
 echo ""
 echo "Done!" 

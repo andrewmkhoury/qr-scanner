@@ -50,7 +50,7 @@ fi
 # Copy resources
 echo "Copying resources..."
 cp "AppIcon.icns" "${TEMP_APP}/Contents/Resources/"
-cp "appicon.png" "${TEMP_APP}/Contents/Resources/"
+cp "images/app-icon.png" "${TEMP_APP}/Contents/Resources/"
 
 # Create Info.plist
 echo "Creating Info.plist..."
