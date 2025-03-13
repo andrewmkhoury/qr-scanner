@@ -59,6 +59,7 @@ let package = Package(
                 // Directories
                 "Config",
                 "test_view",
+                "QR Scanner.app",
             ],
             resources: [
                 .process("AppIcon.icns"),
