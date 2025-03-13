@@ -37,6 +37,7 @@ func expandGlob(pattern: String) -> [String] {
 
 let package = Package(
     name: "QRScreenScanner",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v11)
     ],
