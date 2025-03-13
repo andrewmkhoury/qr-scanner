@@ -1,32 +1,38 @@
 // swift-tools-version:5.3
 import PackageDescription
+import Foundation
 
-// Helper function to generate shell script exclude list
-func shellScripts() -> [String] {
-    return [
-        "create_icns.sh", 
-        "build.sh",
-        "repackage.sh",
-        "repackage_pro.sh",
-        "update_app.sh",
-        "rebuild_test.sh",
-        "rebuild_with_fix.sh",
-        "test_app.sh",
-        "build_app.sh",
-        "create_simple_background.sh",
-        "update_version.sh",
-    ]
-}
-
-// Helper function to generate DMG exclude list
-func dmgFiles() -> [String] {
-    return [
-        "QRScreenScanner.dmg",
-        "QRScreenScanner_v1.0.0.dmg",
-        "QRScreenScanner_v1.0.1.dmg",
-        "QRScreenScanner_v1.0.3.dmg",
-        "QRScreenScanner_v1.0.4.dmg",
-    ]
+// Function to expand glob patterns to file lists
+func expandGlob(pattern: String) -> [String] {
+    let fileManager = FileManager.default
+    let currentDirectory = fileManager.currentDirectoryPath
+    
+    do {
+        // Get all files in the current directory
+        let files = try fileManager.contentsOfDirectory(atPath: currentDirectory)
+        
+        // Use NSRegularExpression to match the pattern
+        let regex: NSRegularExpression
+        let patternString = pattern.replacingOccurrences(of: ".", with: "\\.")
+                                   .replacingOccurrences(of: "*", with: ".*")
+        do {
+            regex = try NSRegularExpression(pattern: "^\(patternString)$", options: [])
+        } catch {
+            print("Error creating regex from pattern '\(pattern)': \(error)")
+            return []
+        }
+        
+        // Filter files that match the pattern
+        let matchingFiles = files.filter { file in
+            let range = NSRange(location: 0, length: file.utf16.count)
+            return regex.firstMatch(in: file, options: [], range: range) != nil
+        }
+        
+        return matchingFiles
+    } catch {
+        print("Error listing files: \(error)")
+        return []
+    }
 }
 
 let package = Package(
@@ -47,37 +53,29 @@ let package = Package(
             path: ".",
             exclude: [
                 // Documentation files
-                "README.md",
+                "README.md", 
                 "PACKAGING.md",
                 "LICENSE",
                 "BUILD.md",
-
+                
                 // Configuration files
-                "Info.plist",
+                "Info.plist", 
                 "QRScreenScanner-Info.plist",
-
+                
                 // Asset files
-                "AppIcon.iconset",
+                "AppIcon.iconset", 
                 "QRScanner-screenshot.png",
-
+                
                 // Project files
                 "QRScreenScanner.xcodeproj",
                 "docs",
-
-                // Shell scripts
-                "build.sh",
-                "create_icns.sh",
-                "create_simple_background.sh",
-                "generate_exclude_list.sh",
-                "repackage.sh",
-                "repackage_pro.sh",
-                "update_version.sh",
-
-                // DMG files
-                "QRScreenScanner_v1.0.0.dmg",
-                "QRScreenScanner_v1.0.1.dmg",
-                "QRScreenScanner_v1.0.4.dmg",
-
+                
+                // Shell scripts - Using glob pattern
+                ] + expandGlob(pattern: "*.sh") + [
+                
+                // DMG files - Using glob pattern
+                ] + expandGlob(pattern: "QRScreenScanner*.dmg") + [
+                
                 // Directories
                 "Config",
                 "test_view",
