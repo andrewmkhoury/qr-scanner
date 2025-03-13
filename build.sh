@@ -3,12 +3,15 @@
 # QR Screen Scanner Build Script
 # This script builds the app from source and packages it as a macOS app
 
+# Source version information
+source Config/version.sh
+
 # Set variables
 APP_NAME="QR Scanner"
-APP_VERSION="1.0.3"
-APP_BUILD="1"
+APP_VERSION="$VERSION"
+APP_BUILD="$BUILD_NUMBER"
 APP_BUNDLE_ID="com.andrewmkhoury.qrscreenscanner"
-APP_COPYRIGHT="Copyright © 2023 Andrew Khoury. All rights reserved."
+APP_COPYRIGHT="$COPYRIGHT"
 DMG_NAME="QRScreenScanner_v${APP_VERSION}"
 TEMP_APP="${APP_NAME}.app"
 TEMP_DIR="temp_dmg"
