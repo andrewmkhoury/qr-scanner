@@ -10,7 +10,7 @@ source Config/version.sh
 APP_NAME="QR Scanner"
 APP_VERSION="$VERSION"
 APP_BUILD="$BUILD_NUMBER"
-APP_BUNDLE_ID="com.andrewmkhoury.qrscreenscanner"
+APP_BUNDLE_ID="io.github.qrscreenscanner"
 APP_COPYRIGHT="$COPYRIGHT"
 DMG_NAME="QRScreenScanner_v${APP_VERSION}"
 ZIP_NAME="QRScreenScanner_v${APP_VERSION}"
