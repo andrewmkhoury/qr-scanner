@@ -68,6 +68,7 @@ class SmartModeController: NSObject {
         scanScreen()
     }
     
+
     func stopSmartMode() {
         print("Stopping smart mode - cleaning up resources")
         
@@ -125,6 +126,7 @@ class SmartModeController: NSObject {
             
             // Get the actual global mouse location for more accurate detection
             let mouseLocation = NSEvent.mouseLocation
+            
             var clickedOnQRCode = false
             var clickedPayload: String?
             
@@ -248,7 +250,7 @@ class SmartModeController: NSObject {
             return
         }
         
-        print("Starting screen scan")
+        print("Starting screen scan for all displays")
         
         // Clear previous data on main thread
         DispatchQueue.main.async { [weak self] in
@@ -262,126 +264,134 @@ class SmartModeController: NSObject {
             print("Previous data cleared")
         }
         
-        // Get a screenshot of the main display
-        guard let screenshot = CGDisplayCreateImage(CGMainDisplayID()) else {
-            print("Failed to create screenshot")
+        // Get all screens
+        let screens = NSScreen.screens
+        print("Found \(screens.count) screen(s) to scan")
+        
+        var allDetectedQRCodes: [(payload: String, rect: CGRect)] = []
+        
+        // Scan each screen
+        for (index, screen) in screens.enumerated() {
+            print("Scanning screen \(index + 1) of \(screens.count)")
+            
+            // Get the display ID for this screen
+            guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+                print("Could not get display ID for screen \(index)")
+                continue
+            }
+            
+            // Get a screenshot of this display
+            guard let screenshot = CGDisplayCreateImage(screenNumber) else {
+                print("Failed to create screenshot for screen \(index)")
+                continue
+            }
+            
+            // Get the screen's frame in global coordinates
+            let screenFrame = screen.frame
+            
+            // Process QR codes for this screen
+            let request = VNDetectBarcodesRequest()
+            let requestHandler = VNImageRequestHandler(cgImage: screenshot, options: [:])
+            
+            do {
+                try requestHandler.perform([request])
+                
+                // Check if we're still active after the request
+                guard isActive else {
+                    print("Controller no longer active after barcode detection")
+                    return
+                }
+                
+                guard let results = request.results else {
+                    print("No results from barcode detection on screen \(index)")
+                    continue
+                }
+                
+                print("Found \(results.count) barcode(s) on screen \(index)")
+                
+                // Filter and process QR codes for this screen
+                for observation in results {
+                    let barcode = observation
+                    
+                    if barcode.symbology == .qr,
+                       let payload = barcode.payloadStringValue {
+                        // Create a local copy of the payload
+                        let localPayload = String(payload)
+                        
+                        // Get the bounding box in normalized coordinates (0-1)
+                        let boundingBox = barcode.boundingBox
+                        
+                        // Convert normalized coordinates to pixel coordinates for this screen
+                        let localX = boundingBox.origin.x * CGFloat(screenshot.width)
+                        let localY = boundingBox.origin.y * CGFloat(screenshot.height)
+                        let localWidth = boundingBox.width * CGFloat(screenshot.width)
+                        let localHeight = boundingBox.height * CGFloat(screenshot.height)
+                        
+                        // Now convert to global screen coordinates
+                        // screenFrame.origin gives us the offset of this screen in global space
+                        // We need to scale from screenshot pixels to screen points
+                        let scaleX = screenFrame.width / CGFloat(screenshot.width)
+                        let scaleY = screenFrame.height / CGFloat(screenshot.height)
+                        
+                        let globalX = screenFrame.origin.x + (localX * scaleX)
+                        let globalY = screenFrame.origin.y + (localY * scaleY)
+                        let globalWidth = localWidth * scaleX
+                        let globalHeight = localHeight * scaleY
+                        
+                        // Add padding around the QR code
+                        let padding: CGFloat = 5
+                        let rect = NSRect(
+                            x: globalX - padding,
+                            y: globalY - padding,
+                            width: globalWidth + (padding * 2),
+                            height: globalHeight + (padding * 2)
+                        ).integral
+                        
+                        allDetectedQRCodes.append((payload: localPayload, rect: rect))
+                    }
+                }
+                
+            } catch {
+                print("Failed to perform QR code detection on screen \(index): \(error)")
+            }
+        }
+        
+        // Check if we're still active before updating UI
+        guard isActive else {
+            print("Controller no longer active before UI update")
             return
         }
         
-        // Create a local copy of the screenshot to avoid memory issues
-        let localScreenshot = screenshot
-        
-        // Process QR codes synchronously to avoid memory issues
-        let request = VNDetectBarcodesRequest()
-        let requestHandler = VNImageRequestHandler(cgImage: localScreenshot, options: [:])
-        
-        do {
-            try requestHandler.perform([request])
-            
-            // Check if we're still active after the request
-            guard isActive else {
-                print("Controller no longer active after barcode detection")
-                return
+        // Update UI on main thread
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.isActive else { 
+                print("SmartModeController is no longer active, skipping UI update")
+                return 
             }
             
-            guard let results = request.results else {
-                print("No results from barcode detection")
-                
-                // Don't set up the global click monitor when no QR codes are found
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self, self.isActive else { 
-                        print("Controller no longer active during UI update (no results)")
-                        return 
-                    }
-                    print("No QR codes found on screen")
-                }
-                return
+            // Update the list and create highlights
+            self.qrCodesList = allDetectedQRCodes.map { $0.payload }
+            
+            // Create a local copy of the QR code locations to avoid memory issues
+            var localQRCodeLocations = [String: CGRect]()
+            
+            for qrCode in allDetectedQRCodes {
+                // Store in local dictionary first
+                localQRCodeLocations[qrCode.payload] = qrCode.rect
+                // Then update the instance variable
+                self.qrCodeLocations[qrCode.payload] = qrCode.rect
+                // Create highlight window
+                self.createHighlightWindow(at: qrCode.rect, for: qrCode.payload)
             }
             
-            // Process detected QR codes
-            var detectedQRCodes: [(payload: String, rect: CGRect)] = []
-            
-            // Filter and process QR codes
-            for observation in results {
-                // Check if it's a barcode observation with QR code data
-                let barcode = observation
-                if barcode.symbology == .qr, 
-                   let payload = barcode.payloadStringValue {
-                    // Create a local copy of the payload
-                    let localPayload = String(payload)
-                    
-                    // Get the bounding box in normalized coordinates
-                    let boundingBox = barcode.boundingBox
-                    
-                    // Get the main screen for coordinate conversion
-                    guard let mainScreen = NSScreen.main else { 
-                        print("Could not get main screen")
-                        continue 
-                    }
-                    
-                    // Get the screen frame in Cocoa coordinates (origin at bottom-left)
-                    let screenFrame = mainScreen.frame
-                    
-                    // Convert Vision coordinates (normalized 0-1, origin at bottom-left) to screen coordinates
-                    // Note: Vision's coordinate system has (0,0) at bottom-left, same as Cocoa
-                    let x = boundingBox.origin.x * screenFrame.width
-                    let y = boundingBox.origin.y * screenFrame.height
-                    let width = boundingBox.width * screenFrame.width
-                    let height = boundingBox.height * screenFrame.height
-                    
-                    // Add padding around the QR code
-                    let padding: CGFloat = 5
-                    let rect = NSRect(
-                        x: x - padding,
-                        y: y - padding,
-                        width: width + (padding * 2),
-                        height: height + (padding * 2)
-                    ).integral
-                    
-                    detectedQRCodes.append((payload: localPayload, rect: rect))
-                }
+            // If no QR codes were found, show a notification
+            if allDetectedQRCodes.isEmpty {
+                print("No QR codes found on any screen")
+            } else {
+                print("Found \(allDetectedQRCodes.count) QR code(s) across all screens and created highlights")
+                // Only setup global monitor when QR codes are actually detected
+                self.setupGlobalClickMonitor()
             }
-            
-            // Check if we're still active before updating UI
-            guard isActive else {
-                print("Controller no longer active before UI update")
-                return
-            }
-            
-            // Update UI on main thread
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self, self.isActive else { 
-                    print("SmartModeController is no longer active, skipping UI update")
-                    return 
-                }
-                
-                // Update the list and create highlights
-                self.qrCodesList = detectedQRCodes.map { $0.payload }
-                
-                // Create a local copy of the QR code locations to avoid memory issues
-                var localQRCodeLocations = [String: CGRect]()
-                
-                for qrCode in detectedQRCodes {
-                    // Store in local dictionary first
-                    localQRCodeLocations[qrCode.payload] = qrCode.rect
-                    // Then update the instance variable
-                    self.qrCodeLocations[qrCode.payload] = qrCode.rect
-                    // Create highlight window
-                    self.createHighlightWindow(at: qrCode.rect, for: qrCode.payload)
-                }
-                
-                // If no QR codes were found, show a notification
-                if detectedQRCodes.isEmpty {
-                    print("No QR codes found on screen")
-                } else {
-                    print("Found \(detectedQRCodes.count) QR codes and created highlights")
-                    // Only setup global monitor when QR codes are actually detected
-                    self.setupGlobalClickMonitor()
-                }
-            }
-            
-        } catch {
-            print("Failed to perform QR code detection: \(error)")
         }
     }
     
@@ -455,10 +465,11 @@ class SmartModeController: NSObject {
             return
         }
         
-        // Make sure the rectangle is valid and has a minimum size
+        // Don't clamp coordinates to 0! Secondary screens can have negative coordinates
+        // Just ensure minimum size
         let safeRect = NSRect(
-            x: max(0, rect.origin.x),
-            y: max(0, rect.origin.y),
+            x: rect.origin.x,  // Keep original X (can be negative for screens to the left)
+            y: rect.origin.y,  // Keep original Y (can be negative for screens below)
             width: max(30, rect.width),
             height: max(30, rect.height)
         ).integral
