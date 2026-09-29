@@ -215,14 +215,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func showQRCodeWindow(with payload: String) {
         print("Creating QR code window for payload: \(payload)")
         
-        // Create a window with more modern dimensions
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        let windowWidth: CGFloat = 400  // Adjusted width for the updated ResultView
-        let windowHeight: CGFloat = 450  // Adjusted height for the updated ResultView with character
+        let windowWidth: CGFloat = 400
+        let windowHeight: CGFloat = 450
         
         let windowRect = NSRect(
-            x: (screenRect.width - windowWidth) / 2,
-            y: (screenRect.height - windowHeight) / 2,
+            x: screenRect.midX - windowWidth / 2,
+            y: screenRect.midY - windowHeight / 2,
             width: windowWidth,
             height: windowHeight
         )
@@ -233,38 +232,124 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        
-        // Set up window delegate to handle the close button in the title bar
-        window.delegate = self
-        
         window.title = "QR Code Detected"
-        window.isReleasedWhenClosed = true
-        
-        // Use system background color for proper dark mode support
+        window.isReleasedWhenClosed = false
         window.backgroundColor = NSColor.windowBackgroundColor
-        
-        // Respect system appearance setting
-        window.appearance = NSAppearance.current
-        
-        // Create SwiftUI ResultView and host it in the window
-        let resultView = ResultView(result: payload)
-        let hostingView = NSHostingView(rootView: resultView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
-        hostingView.autoresizingMask = [.width, .height]
-        
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        window.level = .floating
-        
-        // Add subtle animation when showing the window
-        window.alphaValue = 0.0
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
-            window.animator().alphaValue = 1.0
-        })
-        
-        // Store the window reference
+
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight))
+        contentView.wantsLayer = true
+        contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+
+        let iconView = NSImageView(frame: NSRect(x: (windowWidth - 78) / 2, y: 345, width: 78, height: 78))
+        let appIconURL = Bundle.module.url(
+            forResource: "app-icon",
+            withExtension: "png",
+            subdirectory: "Assets.xcassets/AppIcon.imageset"
+        )
+        iconView.image = appIconURL.flatMap(NSImage.init(contentsOf:))
+            ?? NSImage(systemSymbolName: "qrcode", accessibilityDescription: "QR code")
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        contentView.addSubview(iconView)
+
+        let heading = NSTextField(labelWithString: "QR Code Content")
+        heading.font = .boldSystemFont(ofSize: 15)
+        heading.alignment = .center
+        heading.frame = NSRect(x: 24, y: 310, width: windowWidth - 48, height: 22)
+        contentView.addSubview(heading)
+
+        let valueCard = NSView(frame: NSRect(x: 28, y: 218, width: windowWidth - 56, height: 78))
+        valueCard.wantsLayer = true
+        valueCard.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.65).cgColor
+        valueCard.layer?.cornerRadius = 8
+        valueCard.layer?.borderWidth = 1
+        valueCard.layer?.borderColor = NSColor.separatorColor.cgColor
+
+        let scrollView = NSScrollView(frame: NSRect(x: 8, y: 7, width: valueCard.frame.width - 16, height: valueCard.frame.height - 14))
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .noBorder
+
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: scrollView.contentSize))
+        textView.string = payload
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isVerticallyResizable = true
+        textView.textContainer?.widthTracksTextView = true
+        textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        textView.textColor = .labelColor
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 2, height: 5)
+        scrollView.documentView = textView
+        valueCard.addSubview(scrollView)
+        contentView.addSubview(valueCard)
+
+        let copyButton = NSButton(title: "Copy", target: self, action: #selector(copyResultPayload(_:)))
+        copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy")
+        copyButton.imagePosition = .imageLeading
+        copyButton.bezelStyle = .rounded
+        copyButton.frame = NSRect(x: 91, y: 170, width: 90, height: 30)
+        contentView.addSubview(copyButton)
+
+        if let url = URL(string: payload), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            let openButton = NSButton(title: "Open URL", target: self, action: #selector(openResultURL(_:)))
+            openButton.image = NSImage(systemSymbolName: "safari", accessibilityDescription: "Open URL")
+            openButton.imagePosition = .imageLeading
+            openButton.bezelStyle = .rounded
+            openButton.frame = NSRect(x: 189, y: 170, width: 120, height: 30)
+            contentView.addSubview(openButton)
+
+            let previewCard = NSView(frame: NSRect(x: 28, y: 54, width: windowWidth - 56, height: 96))
+            previewCard.wantsLayer = true
+            previewCard.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.45).cgColor
+            previewCard.layer?.cornerRadius = 8
+            previewCard.layer?.borderWidth = 1
+            previewCard.layer?.borderColor = NSColor.separatorColor.cgColor
+
+            let globeView = NSImageView(frame: NSRect(x: 14, y: 59, width: 18, height: 18))
+            globeView.image = NSImage(systemSymbolName: "globe", accessibilityDescription: "Website")
+            globeView.contentTintColor = .secondaryLabelColor
+            previewCard.addSubview(globeView)
+
+            let siteTitle = NSTextField(labelWithString: url.host ?? "Website")
+            siteTitle.font = .boldSystemFont(ofSize: 13)
+            siteTitle.frame = NSRect(x: 40, y: 57, width: previewCard.frame.width - 54, height: 22)
+            previewCard.addSubview(siteTitle)
+
+            let address = NSTextField(labelWithString: payload)
+            address.font = .systemFont(ofSize: 11)
+            address.textColor = .secondaryLabelColor
+            address.lineBreakMode = .byTruncatingMiddle
+            address.frame = NSRect(x: 14, y: 25, width: previewCard.frame.width - 28, height: 20)
+            previewCard.addSubview(address)
+
+            contentView.addSubview(previewCard)
+        }
+
+        window.contentView = contentView
         self.qrCodeWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func copyResultPayload(_ sender: NSButton) {
+        guard let textView = resultTextView(in: sender.window) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(textView.string, forType: .string)
+    }
+
+    @objc private func openResultURL(_ sender: NSButton) {
+        guard let textView = resultTextView(in: sender.window),
+              let url = URL(string: textView.string),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func resultTextView(in window: NSWindow?) -> NSTextView? {
+        guard let contentView = window?.contentView,
+              let scrollView = contentView.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView else {
+            return nil
+        }
+        return scrollView.documentView as? NSTextView
     }
     
     @objc func closeQRCodeWindow(_ sender: NSButton) {
@@ -479,6 +564,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate {
     func detectQRCode(in image: CGImage) -> [String] {
         let request = VNDetectBarcodesRequest()
+        request.usesCPUOnly = true
         let requestHandler = VNImageRequestHandler(cgImage: image, options: [:])
         
         do {

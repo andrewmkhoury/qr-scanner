@@ -291,6 +291,7 @@ class SmartModeController: NSObject {
             
             // Process QR codes for this screen
             let request = VNDetectBarcodesRequest()
+            request.usesCPUOnly = true
             let requestHandler = VNImageRequestHandler(cgImage: screenshot, options: [:])
             
             do {
@@ -448,12 +449,17 @@ class SmartModeController: NSObject {
     private func clearHighlights() {
         assert(Thread.isMainThread, "clearHighlights must be called on main thread")
         
-        // Close all highlight windows
-        for window in qrHighlightWindows {
+        let windows = qrHighlightWindows
+        qrHighlightWindows.removeAll()
+
+        for window in windows {
             window.orderOut(nil)
         }
-        // Clear the array after all windows are ordered out
-        qrHighlightWindows.removeAll()
+
+        // Finish closing after AppKit has completed the current click or display event.
+        DispatchQueue.main.async {
+            windows.forEach { $0.close() }
+        }
     }
     
     private func createHighlightWindow(at rect: CGRect, for payload: String) {
