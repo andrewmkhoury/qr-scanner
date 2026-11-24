@@ -5,7 +5,7 @@
 
 # Set variables
 APP_NAME="QR Scanner"
-APP_VERSION="1.0.2"
+APP_VERSION="1.0.5"
 APP_BUILD="1"
 APP_BUNDLE_ID="com.andrewmkhoury.qrscreenscanner"
 APP_COPYRIGHT="Copyright © 2023 Andrew Khoury. All rights reserved."
@@ -13,6 +13,8 @@ DMG_NAME="QRScreenScanner_v${APP_VERSION}"
 TEMP_APP="${APP_NAME}.app"
 TEMP_DIR="temp_dmg"
 BUILD_DIR=".build/release"
+X86_BUILD_DIR=".build/x86_64-apple-macosx/release"
+ARM_BUILD_DIR=".build/arm64-apple-macosx/release"
 
 # Print status message
 echo "=== QR Screen Scanner Build Tool ==="
@@ -34,13 +36,29 @@ fi
 echo "Cleaning build directory..."
 rm -rf .build
 
-# Build the project using Swift Package Manager
-echo "Building project using Swift Package Manager..."
-swift build -c release
+# Build Intel and Apple Silicon binaries using Swift Package Manager
+echo "Building Intel version..."
+swift build -c release --triple x86_64-apple-macosx11.0
 
-# Check if build was successful
+echo "Building Apple Silicon version..."
+swift build -c release --triple arm64-apple-macosx11.0
+
+# Check that both architecture builds succeeded
+if [ ! -f "${X86_BUILD_DIR}/QRScreenScanner" ] || [ ! -f "${ARM_BUILD_DIR}/QRScreenScanner" ]; then
+    echo "Error: Build failed! An architecture-specific executable is missing."
+    exit 1
+fi
+
+# Combine the architecture builds into a universal executable
+echo "Creating universal executable..."
+mkdir -p "${BUILD_DIR}"
+lipo -create \
+    "${X86_BUILD_DIR}/QRScreenScanner" \
+    "${ARM_BUILD_DIR}/QRScreenScanner" \
+    -output "${BUILD_DIR}/QRScreenScanner"
+
 if [ ! -f "${BUILD_DIR}/QRScreenScanner" ]; then
-    echo "Error: Build failed! Executable not found at ${BUILD_DIR}/QRScreenScanner"
+    echo "Error: Failed to create universal executable."
     exit 1
 fi
 
@@ -59,6 +77,7 @@ chmod +x "${TEMP_APP}/Contents/MacOS/QRScreenScanner"
 echo "Copying resources..."
 cp "AppIcon.icns" "${TEMP_APP}/Contents/Resources/"
 cp "images/app-icon.png" "${TEMP_APP}/Contents/Resources/"
+cp -R "${ARM_BUILD_DIR}/QRScreenScanner_QRScreenScanner.bundle" "${TEMP_APP}/Contents/Resources/"
 
 # Copy Swift source files for reference
 echo "Copying Swift source files..."

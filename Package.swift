@@ -33,6 +33,7 @@ let package = Package(
                 "QR Scanner.app",
                 "docs",
                 ".build",
+                "build",
                 "LICENSE",
                 "rebuild_test.sh",
                 "test_app.sh",

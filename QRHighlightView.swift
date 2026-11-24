@@ -1,10 +1,8 @@
 import Cocoa
-import Vision
-import CoreGraphics
 
 // MARK: - QR Highlight View
 class QRHighlightView: NSView {
-    private var displayLink: CVDisplayLink?
+    private var animationTimer: Timer?
     var payload: String = ""
     var onMouseClick: ((String) -> Void)?
     
@@ -12,7 +10,6 @@ class QRHighlightView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
-        setupDisplayLink()
         
         // Enable mouse tracking
         let trackingArea = NSTrackingArea(
@@ -23,7 +20,17 @@ class QRHighlightView: NSView {
         )
         addTrackingArea(trackingArea)
     }
-    
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+
+        if window == nil {
+            stopAnimation()
+        } else {
+            startAnimation()
+        }
+    }
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -49,45 +56,25 @@ class QRHighlightView: NSView {
     override func mouseExited(with event: NSEvent) {
         NSCursor.pop()
     }
-    
+
     deinit {
-        // Clean up display link
-        if let displayLink = self.displayLink {
-            CVDisplayLinkStop(displayLink)
-            self.displayLink = nil
-        }
-        
-        // Clear the callback to break any potential reference cycles
+        animationTimer?.invalidate()
         onMouseClick = nil
     }
-    
-    private func setupDisplayLink() {
-        var link: CVDisplayLink?
-        let error = CVDisplayLinkCreateWithActiveCGDisplays(&link)
-        
-        guard error == kCVReturnSuccess, let displayLink = link else {
-            print("Failed to create display link")
-            return
+
+    private func startAnimation() {
+        guard animationTimer == nil else { return }
+
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            self?.needsDisplay = true
         }
-        
-        // Use a strong reference to self for the display link callback
-        // This is safe because we clean up in deinit
-        let opaqueself = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
-        
-        let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, opaquePointer -> CVReturn in
-            guard let pointer = opaquePointer else { return kCVReturnError }
-            
-            let view = Unmanaged<QRHighlightView>.fromOpaque(pointer).takeUnretainedValue()
-            DispatchQueue.main.async {
-                view.setNeedsDisplay(view.bounds)
-            }
-            return kCVReturnSuccess
-        }
-        
-        CVDisplayLinkSetOutputCallback(displayLink, callback, opaqueself)
-        
-        self.displayLink = displayLink
-        CVDisplayLinkStart(displayLink)
+        animationTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
     }
     
     override func draw(_ dirtyRect: NSRect) {

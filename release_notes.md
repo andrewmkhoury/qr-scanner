@@ -1,3 +1,9 @@
+## QR Screen Scanner v1.0.5
+
+This release fixes two issues in the QR result window:
+- Prevents a crash when the result window loads the app icon from an unavailable SwiftPM resource bundle.
+- Fixes the Copy button so it finds and copies the QR payload from the nested result view.
+
 ## QR Screen Scanner v1.0.2
 
 This release includes:

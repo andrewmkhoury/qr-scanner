@@ -19,6 +19,7 @@ playground.xcworkspace
 #
 .build/
 .swiftpm/
+/build/
 
 # macOS specific
 .DS_Store
